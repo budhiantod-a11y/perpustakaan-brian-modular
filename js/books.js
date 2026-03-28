@@ -8,6 +8,7 @@ import { totalStock, avgBuy } from './fifo.js';
 let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
 
+// ── Add Book ─────────────────────────────────────────────────────────────────
 export function openAddBook() {
   openModal(`
     <div class="modal-title">Tambah Buku Baru</div>
@@ -51,7 +52,7 @@ export function openAddBook() {
     </div>`);
 }
 
-
+// ── Edit Book ────────────────────────────────────────────────────────────────
 export function openEditBook(bookId) {
   const b = S.books.find(x => x.id === bookId);
   openModal(`
@@ -85,7 +86,7 @@ export function openEditBook(bookId) {
     </div>`);
 }
 
-
+// ── Save New Book ────────────────────────────────────────────────────────────
 export function saveBook() {
   const v = k => document.getElementById('f_'+k)?.value?.trim();
   if (!v('title')||!v('barcode')||!v('sell')||!v('bp')) { showToast('Lengkapi field wajib (judul, barcode, harga modal, harga normal)!', 'err'); return; }
@@ -103,6 +104,7 @@ export function saveBook() {
   S.books.push(book); closeModal(); S.save(); showToast('Buku ditambahkan ✓'); _render();
 }
 
+// ── Update Existing Book ─────────────────────────────────────────────────────
 export function updateBook(bookId) {
   const v = k => document.getElementById('f_'+k)?.value?.trim();
   const book = S.books.find(b => b.id===bookId);
@@ -113,6 +115,7 @@ export function updateBook(bookId) {
   closeModal(); S.save(); showToast('Buku diperbarui ✓'); _render();
 }
 
+// ── Restock ──────────────────────────────────────────────────────────────────
 export function openAddRestock(bookId) {
   const book = S.books.find(b => b.id===bookId);
   openModal(`
@@ -150,6 +153,7 @@ export function saveRestock(bookId) {
   closeModal(); S.save(); showToast(`+${qty} pcs batch baru ✓`); _render();
 }
 
+// ── Delete Book ──────────────────────────────────────────────────────────────
 export function deleteBook(bookId) {
   const book = S.books.find(b => b.id === bookId);
   const hasSales = S.sales.some(s => s.bookId === bookId);
