@@ -290,7 +290,7 @@ export function confirmScanBundle() {
     cogs: totalCogs, profit,
     date: today(), via: 'scan',
     priceOverride: false, note,
-    S.bundleItems: S.scanBundleItems.map(item => {
+    bundleItems: S.scanBundleItems.map(item => {
       const d = deductions.find(d => d.bookId === item.bookId);
       return { bookId: item.bookId, bookTitle: item.book.title, qty: item.qty, cogs: d?.cogs||0, buyPrice: d ? Math.round(d.cogs/item.qty) : 0 };
     }),
@@ -299,6 +299,7 @@ export function confirmScanBundle() {
   S.set.scanBundleItems([]);
   S.set.scanBundleMode(false);
   S.save(); _render();
+}
 
 // ── Bundle Modal ────────────────────────────────────────────────────────────
 export function openBundleModal() {
@@ -473,7 +474,7 @@ export function saveBundleSale() {
     via:            'manual',
     priceOverride:  false,
     note,
-    S.bundleItems:    S.bundleItems.map(item => {
+    bundleItems:    S.bundleItems.map(item => {
       const b = S.books.find(x => x.id === item.bookId);
       const d = deductions.find(d => d.bookId === item.bookId);
       return {
