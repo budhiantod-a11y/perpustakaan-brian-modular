@@ -290,7 +290,7 @@ export function confirmScanBundle() {
     cogs: totalCogs, profit,
     date: today(), via: 'scan',
     priceOverride: false, note,
-    bundleItems: S.scanBundleItems.map(item => {
+    S.bundleItems: S.scanBundleItems.map(item => {
       const d = deductions.find(d => d.bookId === item.bookId);
       return { bookId: item.bookId, bookTitle: item.book.title, qty: item.qty, cogs: d?.cogs||0, buyPrice: d ? Math.round(d.cogs/item.qty) : 0 };
     }),
