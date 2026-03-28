@@ -26,10 +26,10 @@ export function render() {
     area.innerHTML = `
       <div class="page-hdr">
         <div><div class="page-title">Dashboard</div><div class="page-sub">Ringkasan performa toko</div></div>
-        <div class="S.period-bar" style="margin-bottom:0">
+        <div class="period-bar" style="margin-bottom:0">
           <label>Periode</label>
           <input type="date" value="${S.period.from}" onchange="setPeriodFrom(this.value)">
-          <span class="S.period-sep">—</span>
+          <span class="period-sep">—</span>
           <input type="date" value="${S.period.to}" onchange="setPeriodTo(this.value)">
         </div>
       </div>
@@ -670,12 +670,12 @@ export function render() {
         <button class="btn btn-primary" onclick="exportCSV()">↓ Export CSV</button>
       </div>
 
-      <div class="S.period-bar">
+      <div class="period-bar">
         <label>Periode</label>
         <input type="date" value="${S.period.from}" onchange="setPeriodFrom(this.value)">
-        <span class="S.period-sep">—</span>
+        <span class="period-sep">—</span>
         <input type="date" value="${S.period.to}" onchange="setPeriodTo(this.value)">
-        <span class="S.period-count">${filtered.length} transaksi ditemukan</span>
+        <span class="period-count">${filtered.length} transaksi ditemukan</span>
       </div>
 
       <div class="stat-grid">
