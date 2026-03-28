@@ -95,8 +95,7 @@ export function saveBook() {
   if (normalP <= 0) { showToast('Harga normal harus lebih dari 0', 'err'); return; }
   if (buyP < 0) { showToast('Harga modal tidak boleh negatif', 'err'); return; }
   if (+v('stock') < 0) { showToast('Stok awal tidak boleh negatif', 'err'); return; }
-  // normalPrice = harga normal/jual default; sellPrice kept as alias for compat
-
+  const book = { id:uid(), barcode:v('barcode'), title:v('title'), author:v('author'), publisher:v('publisher'), category:v('category'), normalPrice:normalP, sellPrice:normalP, batches:[] };
   if (+v('stock')>0) {
     book.batches.push({ id:uid(), qty:+v('stock'), remaining:+v('stock'), buyPrice:buyP, date:today() });
     S.restocks.push({ id:uid(), bookId:book.id, bookTitle:book.title, qty:+v('stock'), buyPrice:buyP, date:today() });
