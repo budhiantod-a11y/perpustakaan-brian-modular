@@ -65,6 +65,7 @@ export function save() {
 const GS_KEY = 'perpbrian_gs_url';
 export let gsUrl = localStorage.getItem(GS_KEY) || '';
 let syncTimer = null;
+let bootFetching = false;  // Phase 2: block sync while fetching from Sheets
 
 export function setGsUrl(url) { gsUrl = url; localStorage.setItem(GS_KEY, url); }
 
@@ -80,12 +81,14 @@ export function updateSyncUI(state) {
 
 function scheduleSync() {
   if (!gsUrl) return;
+  if (bootFetching) return;  // Phase 2: don't sync while boot fetch in progress
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => syncToSheets(), 1500);
 }
 
 export async function syncToSheets(showFeedback=false) {
   if (!gsUrl) return;
+  if (bootFetching) return;  // Phase 2: never sync during boot fetch
   if (location.protocol==='file:') { updateSyncUI('error'); return; }
   updateSyncUI('syncing');
   try {
@@ -115,6 +118,39 @@ export async function loadFromSheets() {
     }
   } catch(e) {}
   updateSyncUI('error'); return false;
+}
+
+// ── Phase 2: Sheets-first boot fetch ─────────────────────────────────────────
+export async function fetchFromSheetsOnBoot() {
+  if (!gsUrl) return { ok: false, reason: 'no-url' };
+  if (location.protocol === 'file:') return { ok: false, reason: 'file-protocol' };
+  bootFetching = true;  // Block all syncs until fetch completes
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout
+    const res = await fetch(gsUrl+'?action=load&t='+Date.now(), { redirect:'follow', signal: controller.signal });
+    clearTimeout(timeout);
+    const json = JSON.parse(await res.text());
+    if (json.ok && json.data) {
+      const sheetBooks = json.data.books||[];
+      const sheetSales = json.data.sales||[];
+      const sheetRestocks = json.data.restocks||[];
+      // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
+      if (sheetBooks.length > 0 || sheetSales.length > 0) {
+        books = sheetBooks; sales = sheetSales; restocks = sheetRestocks;
+        // Save to localStorage (but scheduleSync is blocked, so won't push back to Sheets)
+        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, period })); }
+        catch(e) {}
+      }
+      bootFetching = false;
+      return { ok: true };
+    }
+    bootFetching = false;
+    return { ok: false, reason: 'bad-response' };
+  } catch(e) {
+    bootFetching = false;
+    return { ok: false, reason: e.name === 'AbortError' ? 'timeout' : 'network' };
+  }
 }
 
 updateSyncUI('idle');
