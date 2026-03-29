@@ -113,7 +113,6 @@ export async function loadFromSheets() {
   try {
     const json = await (await fetch(gsUrl+'?action=load&t='+Date.now())).json();
     if (json.ok && json.data) {
-      // Sanitize dates
       const fixDate = d => {
         if (!d || typeof d !== 'string') return localDate();
         if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
@@ -121,12 +120,23 @@ export async function loadFromSheets() {
         if (isNaN(parsed)) return localDate();
         return parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
       };
-      books = (json.data.books||[]).map(b => {
-        if (b.batches) b.batches = b.batches.map(bt => ({ ...bt, date: fixDate(bt.date) }));
-        return b;
-      });
-      sales = (json.data.sales||[]).map(s => ({ ...s, date: fixDate(s.date) }));
-      restocks = (json.data.restocks||[]).map(r => ({ ...r, date: fixDate(r.date) }));
+      const num = v => Number(v)||0;
+      books = (json.data.books||[]).map(b => ({
+        ...b, id: num(b.id)||b.id, normalPrice: num(b.normalPrice), sellPrice: num(b.sellPrice),
+        batches: (b.batches||[]).map(bt => ({ ...bt, id: num(bt.id)||bt.id, qty: num(bt.qty), remaining: num(bt.remaining), buyPrice: num(bt.buyPrice), date: fixDate(bt.date) })),
+      }));
+      sales = (json.data.sales||[]).map(s => ({
+        ...s, id: num(s.id)||s.id, bookId: s.bookId ? num(s.bookId) : null,
+        qty: num(s.qty), buyPrice: num(s.buyPrice), normalPrice: num(s.normalPrice), sellPrice: num(s.sellPrice),
+        finalPrice: num(s.finalPrice), finalSellPrice: num(s.finalSellPrice), cogs: num(s.cogs), profit: num(s.profit),
+        priceOverride: s.priceOverride===true||s.priceOverride==='TRUE'||s.priceOverride==='true',
+        isBundle: s.isBundle===true||s.isBundle==='TRUE'||s.isBundle==='true',
+        date: fixDate(s.date),
+        bundleItems: (s.bundleItems||[]).map(i => ({ ...i, bookId: num(i.bookId)||i.bookId, qty: num(i.qty), cogs: num(i.cogs), buyPrice: num(i.buyPrice) })),
+      }));
+      restocks = (json.data.restocks||[]).map(r => ({
+        ...r, id: num(r.id)||r.id, bookId: num(r.bookId)||r.bookId, qty: num(r.qty), buyPrice: num(r.buyPrice), date: fixDate(r.date),
+      }));
       save(); updateSyncUI('connected'); return true;
     }
   } catch(e) {}
@@ -148,17 +158,63 @@ export async function fetchFromSheetsOnBoot() {
       // Sanitize dates — GSheets may return Date objects as long strings
       const fixDate = d => {
         if (!d || typeof d !== 'string') return localDate();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; // already YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
         const parsed = new Date(d);
         if (isNaN(parsed)) return localDate();
         return parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
       };
-      const sheetBooks = (json.data.books||[]).map(b => {
-        if (b.batches) b.batches = b.batches.map(bt => ({ ...bt, date: fixDate(bt.date) }));
-        return b;
-      });
-      const sheetSales = (json.data.sales||[]).map(s => ({ ...s, date: fixDate(s.date) }));
-      const sheetRestocks = (json.data.restocks||[]).map(r => ({ ...r, date: fixDate(r.date) }));
+      const num = v => Number(v)||0;
+
+      // Sanitize books
+      const sheetBooks = (json.data.books||[]).map(b => ({
+        ...b,
+        id: num(b.id)||b.id,
+        normalPrice: num(b.normalPrice),
+        sellPrice: num(b.sellPrice),
+        batches: (b.batches||[]).map(bt => ({
+          ...bt,
+          id: num(bt.id)||bt.id,
+          qty: num(bt.qty),
+          remaining: num(bt.remaining),
+          buyPrice: num(bt.buyPrice),
+          date: fixDate(bt.date),
+        })),
+      }));
+
+      // Sanitize sales
+      const sheetSales = (json.data.sales||[]).map(s => ({
+        ...s,
+        id: num(s.id)||s.id,
+        bookId: s.bookId ? num(s.bookId) : null,
+        qty: num(s.qty),
+        buyPrice: num(s.buyPrice),
+        normalPrice: num(s.normalPrice),
+        sellPrice: num(s.sellPrice),
+        finalPrice: num(s.finalPrice),
+        finalSellPrice: num(s.finalSellPrice),
+        cogs: num(s.cogs),
+        profit: num(s.profit),
+        priceOverride: s.priceOverride === true || s.priceOverride === 'TRUE' || s.priceOverride === 'true',
+        isBundle: s.isBundle === true || s.isBundle === 'TRUE' || s.isBundle === 'true',
+        date: fixDate(s.date),
+        bundleItems: (s.bundleItems||[]).map(i => ({
+          ...i,
+          bookId: num(i.bookId)||i.bookId,
+          qty: num(i.qty),
+          cogs: num(i.cogs),
+          buyPrice: num(i.buyPrice),
+        })),
+      }));
+
+      // Sanitize restocks
+      const sheetRestocks = (json.data.restocks||[]).map(r => ({
+        ...r,
+        id: num(r.id)||r.id,
+        bookId: num(r.bookId)||r.bookId,
+        qty: num(r.qty),
+        buyPrice: num(r.buyPrice),
+        date: fixDate(r.date),
+      }));
       // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
       if (sheetBooks.length > 0 || sheetSales.length > 0) {
         books = sheetBooks; sales = sheetSales; restocks = sheetRestocks;
