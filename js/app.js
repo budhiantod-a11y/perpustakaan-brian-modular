@@ -183,8 +183,36 @@ Object.assign(window, {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Boot
+// Boot — Phase 2: Sheets-first with localStorage fallback
 // ═══════════════════════════════════════════════════════════════════════════
-S.load();
+S.load();           // 1. Load localStorage instantly
 Scanner.setupKeyboardScanner();
-render();
+render();           // 2. Render immediately (fast boot)
+
+// 3. If GSheets URL configured, fetch from Sheets in background
+if (S.gsUrl) {
+  const banner = document.getElementById('sync-banner');
+  if (banner) { banner.style.display = 'flex'; banner.className = 'sync-banner syncing'; banner.innerHTML = '<span class="sync-banner-dot"></span> Mengambil data dari Google Sheets…'; }
+  S.updateSyncUI('syncing');
+
+  S.fetchFromSheetsOnBoot().then(result => {
+    if (result.ok) {
+      // Sheets data overwrites localStorage — re-render
+      render();
+      S.updateSyncUI('connected');
+      if (banner) { banner.className = 'sync-banner synced'; banner.innerHTML = '✓ Data dari Google Sheets berhasil dimuat'; setTimeout(() => banner.style.display = 'none', 3000); }
+    } else {
+      S.updateSyncUI(result.reason === 'no-url' ? 'idle' : 'error');
+      if (banner) {
+        if (result.reason === 'timeout') {
+          banner.className = 'sync-banner error'; banner.innerHTML = '⚠ Timeout — menggunakan data lokal (offline mode)';
+        } else if (result.reason === 'network') {
+          banner.className = 'sync-banner error'; banner.innerHTML = '⚠ Tidak bisa terhubung — menggunakan data lokal';
+        } else {
+          banner.style.display = 'none';
+        }
+        setTimeout(() => banner.style.display = 'none', 5000);
+      }
+    }
+  });
+}
