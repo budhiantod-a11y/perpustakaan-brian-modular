@@ -36,7 +36,7 @@ export function render() {
 
       <div class="save-notice"><div class="save-dot"></div>Data tersimpan di browser ini · <strong style="color:var(--text2)">${S.books.length} buku</strong> terdaftar</div>
 
-      ${lowStock.length ? `<div class="alert-bar">⚠ Stok hampir habis: ${lowStock.map(b=>`<strong>${b.title}</strong> (${totalStock(b)} pcs)`).join(', ')}</div>` : ''}
+      ${lowStock.length ? `<div class="alert-bar">⚠ Stok hampir habis: ${lowStock.slice(0,3).map(b=>`<strong>${b.title}</strong> (${totalStock(b)} pcs)`).join(', ')}${lowStock.length > 3 ? ` <span style="color:var(--text2)">dan <strong>${lowStock.length - 3} buku lainnya</strong></span>` : ''}</div>` : ''}
 
       <div class="stat-grid">
         <div class="stat-card">
@@ -301,6 +301,7 @@ export function render() {
                 <span class="badge ${stock<=5?'badge-red':'badge-green'}" style="font-size:12px;padding:4px 10px">${stock} pcs</span>
                 <button class="btn btn-ghost btn-sm" onclick="openEditBook(${b.id})">Edit</button>
                 <button class="btn btn-green btn-sm" onclick="openAddRestock(${b.id})">+ Restock</button>
+                <button class="btn btn-ghost btn-sm" onclick="openStokOpname(${b.id})" style="color:var(--amber);border-color:var(--amber-s)">📋 Opname</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteBook(${b.id})">Hapus</button>
               </div>
             </div>

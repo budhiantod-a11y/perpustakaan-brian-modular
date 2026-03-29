@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import * as S from './state.js';
 import { openModal, closeModal, showToast, uid, today, fmt, getNormalPrice, allPubs, allCats } from './helpers.js';
-import { totalStock, avgBuy } from './fifo.js';
+import { totalStock, avgBuy, fifoDeduct } from './fifo.js';
 
 let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
@@ -55,6 +55,7 @@ export function openAddBook() {
 // ── Edit Book ────────────────────────────────────────────────────────────────
 export function openEditBook(bookId) {
   const b = S.books.find(x => x.id === bookId);
+  const activeBatches = b.batches.filter(bt => bt.remaining > 0);
   openModal(`
     <div class="modal-title">Edit Buku</div>
     <div class="inp-grid-2">
@@ -80,6 +81,18 @@ export function openEditBook(bookId) {
         </div>
       </div>
     </div>
+    ${activeBatches.length ? `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-s);padding:14px;margin-top:8px;margin-bottom:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📦 Harga Modal per Batch (FIFO)</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Edit harga beli jika awalnya belum diisi atau perlu koreksi</div>
+      ${activeBatches.map((bt,i) => `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:12px">
+        <span style="color:var(--text3);min-width:60px">${bt.date||'—'}</span>
+        <span style="min-width:50px">${bt.remaining} pcs</span>
+        <input class="inp" id="f_bp_${i}" type="number" value="${bt.buyPrice}" style="width:120px;font-size:12px;padding:4px 8px" data-batch-id="${bt.id}">
+        <span style="color:var(--text3)">/pcs</span>
+      </div>`).join('')}
+    </div>` : ''}
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
       <button class="btn btn-primary" onclick="updateBook(${bookId})">Simpan</button>
@@ -112,6 +125,15 @@ export function updateBook(bookId) {
   if (S.books.find(b => b.barcode===v('barcode') && b.id!==bookId)) { showToast('Barcode sudah dipakai!', 'err'); return; }
   const normalP = +v('sell')||0;
   Object.assign(book, { title:v('title'), author:v('author'), publisher:v('publisher'), category:v('category'), barcode:v('barcode'), normalPrice:normalP, sellPrice:normalP });
+  // Update batch buy prices
+  const activeBatches = book.batches.filter(bt => bt.remaining > 0);
+  activeBatches.forEach((bt, i) => {
+    const inp = document.getElementById('f_bp_'+i);
+    if (inp) {
+      const newPrice = +inp.value;
+      if (newPrice >= 0) bt.buyPrice = newPrice;
+    }
+  });
   closeModal(); S.save(); showToast('Buku diperbarui ✓'); _render();
 }
 
@@ -178,4 +200,71 @@ export function deleteRestock(restockId) {
   }
   S.set.restocks(S.restocks.filter(r => r.id !== restockId));
   S.save(); showToast('Restock dihapus · stok dikurangi'); _render();
+}
+
+// ── Stok Opname ──────────────────────────────────────────────────────────────
+export function openStokOpname(bookId) {
+  const book = S.books.find(b => b.id === bookId);
+  const current = totalStock(book);
+  openModal(`
+    <div class="modal-title">📋 Stok Opname — ${book.title}</div>
+    <div style="background:var(--accent-s);border-radius:var(--radius-s);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--accent)">
+      Stok di sistem: <strong>${current} pcs</strong>
+    </div>
+    <div class="field">
+      <label>Stok fisik sebenarnya (pcs)</label>
+      <input class="inp" id="f_opname_qty" type="number" min="0" value="${current}" style="max-width:150px">
+      <div class="hint">Hitung stok fisik, input angka sebenarnya. Sistem akan adjust otomatis.</div>
+    </div>
+    <div class="field">
+      <label>Alasan koreksi</label>
+      <input class="inp" id="f_opname_note" placeholder="e.g. salah hitung, barang rusak, hilang...">
+    </div>
+    <div id="opname-preview" style="font-size:13px;padding:10px 0;color:var(--text3)">
+      Selisih: <strong>0 pcs</strong> (tidak ada perubahan)
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveStokOpname(${bookId})">Simpan Opname</button>
+    </div>`);
+  // Live preview
+  const inp = document.getElementById('f_opname_qty');
+  if (inp) inp.addEventListener('input', () => {
+    const newQty = +inp.value;
+    const diff = newQty - current;
+    const pv = document.getElementById('opname-preview');
+    if (pv) {
+      if (diff > 0) pv.innerHTML = `Selisih: <strong style="color:var(--green)">+${diff} pcs</strong> (akan ditambah sebagai batch baru)`;
+      else if (diff < 0) pv.innerHTML = `Selisih: <strong style="color:var(--red)">${diff} pcs</strong> (akan dikurangi dari batch terlama / FIFO)`;
+      else pv.innerHTML = `Selisih: <strong>0 pcs</strong> (tidak ada perubahan)`;
+    }
+  });
+}
+
+export function saveStokOpname(bookId) {
+  const book = S.books.find(b => b.id === bookId);
+  const current = totalStock(book);
+  const newQty = +document.getElementById('f_opname_qty')?.value;
+  const note = document.getElementById('f_opname_note')?.value?.trim() || 'Stok opname';
+  if (isNaN(newQty) || newQty < 0) { showToast('Jumlah stok tidak valid', 'err'); return; }
+  const diff = newQty - current;
+  if (diff === 0) { closeModal(); showToast('Stok tidak berubah'); return; }
+
+  if (diff > 0) {
+    // Tambah stok — buat batch baru dengan harga modal rata-rata
+    const bp = avgBuy(book) || 0;
+    book.batches.push({ id:uid(), qty:diff, remaining:diff, buyPrice:bp, date:today(), note });
+    S.restocks.push({ id:uid(), bookId, bookTitle:book.title, qty:diff, buyPrice:bp, date:today(), note: `Opname: +${diff} · ${note}` });
+  } else {
+    // Kurangi stok — deduct FIFO
+    const deductQty = Math.abs(diff);
+    if (deductQty > current) { showToast('Stok fisik tidak boleh negatif', 'err'); return; }
+    fifoDeduct(bookId, deductQty);
+    // Catat sebagai adjustment (restock negatif)
+    S.restocks.push({ id:uid(), bookId, bookTitle:book.title, qty: -deductQty, buyPrice:0, date:today(), note: `Opname: ${diff} · ${note}` });
+  }
+
+  closeModal(); S.save();
+  showToast(`Stok opname ✓ · ${book.title}: ${current} → ${newQty} (${diff>=0?'+':''}${diff})`);
+  _render();
 }

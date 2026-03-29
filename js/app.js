@@ -102,6 +102,8 @@ Object.assign(window, {
   openAddBook:    Books.openAddBook,
   openEditBook:   Books.openEditBook,
   openAddRestock: Books.openAddRestock,
+  openStokOpname: Books.openStokOpname,
+  saveStokOpname: Books.saveStokOpname,
   deleteBook:     Books.deleteBook,
   deleteRestock:  Books.deleteRestock,
   saveBook:       Books.saveBook,
