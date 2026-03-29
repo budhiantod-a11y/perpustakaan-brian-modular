@@ -510,13 +510,42 @@ tbody tr:hover { background: var(--surface2); }
 
 /* ── ALERT ── */
 .alert-bar {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: flex-start; gap: 8px;
   background: var(--red-s); border: 1px solid #fecaca;
   border-radius: var(--radius-s);
   padding: 10px 14px;
   font-size: 12px; color: var(--red);
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
+.low-stock-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.low-chip {
+  background: white; border: 1px solid #fecaca;
+  border-radius: 20px; padding: 2px 10px;
+  font-size: 11px; white-space: nowrap;
+}
+
+/* ── MOBILE TRANSACTION CARDS ── */
+.mobile-cards { display: none; }
+.trx-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+.trx-bundle { border-color: #e9d5ff; background: #fdf4ff; }
+.trx-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+.trx-card-title { font-weight: 600; font-size: 13px; flex: 1; }
+.trx-card-date { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.trx-card-detail { font-size: 11px; color: #7c3aed; margin-bottom: 6px; line-height: 1.4; }
+.trx-card-bottom { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.trx-card-price { font-weight: 700; }
+.trx-card-profit { color: var(--green); font-weight: 600; }
+.hide-mobile { display: block; }
+.show-mobile { display: none; }
 
 /* ── PROFIT BAR ── */
 .profit-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; }
@@ -602,7 +631,11 @@ tbody tr:hover { background: var(--surface2); }
     gap: 8px;
   }
   .table-wrap {
-    font-size: 12px;
+    font-size: 11px;
+    overflow-x: auto;
+  }
+  .table-wrap th, .table-wrap td {
+    padding: 6px 8px;
   }
   .modal {
     width: 95vw;
@@ -612,4 +645,17 @@ tbody tr:hover { background: var(--surface2); }
   .inp-grid-2 {
     grid-template-columns: 1fr;
   }
+  /* Show mobile cards, hide desktop table on dashboard */
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
+  /* Low stock chips smaller */
+  .low-chip { font-size: 10px; padding: 1px 8px; }
+  .alert-bar { font-size: 11px; padding: 8px 10px; }
+  /* Period bar */
+  .period-bar { flex-wrap: wrap; gap: 6px; }
+  .period-bar input { font-size: 12px; }
+  /* Book cards */
+  .book-card { padding: 12px; }
+  .page-actions { gap: 6px; }
+  .page-actions .btn { font-size: 11px; padding: 5px 10px; }
 }
