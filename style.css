@@ -522,6 +522,62 @@ tbody tr:hover { background: var(--surface2); }
   margin-bottom: 14px;
   display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
 }
-</style>
-</head>
-<body>
+
+/* ── RESPONSIVE / MOBILE ── */
+@media (max-width: 768px) {
+  .topnav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .logo {
+    margin-right: auto;
+  }
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 2px;
+    padding-bottom: 2px;
+  }
+  .nav-tab {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+  .nav-right {
+    order: 2;
+    margin-left: 0;
+    gap: 6px;
+  }
+  .sync-btn {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+  .main {
+    padding: 16px 12px;
+  }
+  .page-hdr {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .page-title {
+    font-size: 17px;
+  }
+  .stat-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .table-wrap {
+    font-size: 12px;
+  }
+  .modal {
+    width: 95vw;
+    max-height: 90vh;
+    padding: 16px;
+  }
+  .inp-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
