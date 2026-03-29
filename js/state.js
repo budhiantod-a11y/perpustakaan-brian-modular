@@ -113,7 +113,20 @@ export async function loadFromSheets() {
   try {
     const json = await (await fetch(gsUrl+'?action=load&t='+Date.now())).json();
     if (json.ok && json.data) {
-      books = json.data.books||[]; sales = json.data.sales||[]; restocks = json.data.restocks||[];
+      // Sanitize dates
+      const fixDate = d => {
+        if (!d || typeof d !== 'string') return localDate();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+        const parsed = new Date(d);
+        if (isNaN(parsed)) return localDate();
+        return parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
+      };
+      books = (json.data.books||[]).map(b => {
+        if (b.batches) b.batches = b.batches.map(bt => ({ ...bt, date: fixDate(bt.date) }));
+        return b;
+      });
+      sales = (json.data.sales||[]).map(s => ({ ...s, date: fixDate(s.date) }));
+      restocks = (json.data.restocks||[]).map(r => ({ ...r, date: fixDate(r.date) }));
       save(); updateSyncUI('connected'); return true;
     }
   } catch(e) {}
@@ -132,9 +145,20 @@ export async function fetchFromSheetsOnBoot() {
     clearTimeout(timeout);
     const json = JSON.parse(await res.text());
     if (json.ok && json.data) {
-      const sheetBooks = json.data.books||[];
-      const sheetSales = json.data.sales||[];
-      const sheetRestocks = json.data.restocks||[];
+      // Sanitize dates — GSheets may return Date objects as long strings
+      const fixDate = d => {
+        if (!d || typeof d !== 'string') return localDate();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d; // already YYYY-MM-DD
+        const parsed = new Date(d);
+        if (isNaN(parsed)) return localDate();
+        return parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
+      };
+      const sheetBooks = (json.data.books||[]).map(b => {
+        if (b.batches) b.batches = b.batches.map(bt => ({ ...bt, date: fixDate(bt.date) }));
+        return b;
+      });
+      const sheetSales = (json.data.sales||[]).map(s => ({ ...s, date: fixDate(s.date) }));
+      const sheetRestocks = (json.data.restocks||[]).map(r => ({ ...r, date: fixDate(r.date) }));
       // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
       if (sheetBooks.length > 0 || sheetSales.length > 0) {
         books = sheetBooks; sales = sheetSales; restocks = sheetRestocks;
