@@ -413,6 +413,10 @@ export function render() {
                 <label style="font-size:12px">Catatan (opsional)</label>
                 <input class="inp" id="scan-bundle-note" placeholder="e.g. paket hemat..." value="">
               </div>
+              <div class="field" style="margin-top:8px;margin-bottom:0">
+                <label style="font-size:12px">Tanggal</label>
+                <input class="inp" id="scan-bundle-date" type="date" value="${today()}" max="${today()}" style="max-width:180px">
+              </div>
             </div>
 
             <div style="display:flex;gap:8px;margin-top:12px">
@@ -507,11 +511,12 @@ export function render() {
             </div>`;
           })()}` : ''}
 
-          <div style="display:flex;gap:8px;margin-top:14px">
+          <div style="display:flex;gap:8px;margin-top:14px;align-items:flex-end">
             <button class="btn ${S.scanMode==='sale'?'btn-primary':'btn-green'}" onclick="confirmScan()">
               ✓ Konfirmasi ${S.scanMode==='sale'?'Jual':'Restock'}
             </button>
             <button class="btn btn-ghost" onclick="cancelScanResult()">Batal</button>
+            ${S.scanMode==='sale'?`<div class="field" style="margin-bottom:0;margin-left:auto"><label style="font-size:11px">Tanggal</label><input class="inp" id="scan-sale-date" type="date" value="${today()}" max="${today()}" style="max-width:160px;font-size:12px"></div>`:''}
           </div>
         </div>` : ''}
 

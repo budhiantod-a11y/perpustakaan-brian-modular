@@ -43,6 +43,7 @@ export function confirmScan() {
   if (isDiskon && !S.scanOverNote.trim()) { showToast('Isi catatan untuk harga final yang berbeda', 'err'); return; }
   if (S.scanMode === 'sale') {
     if (S.scanQty > totalStock(S.scanResult)) { showToast('Stok tidak cukup!', 'err'); return; }
+    const date = document.getElementById('scan-sale-date')?.value || today();
     const { cogs } = fifoDeduct(S.scanResult.id, S.scanQty);
     S.sales.push({
       id:uid(), bookId:S.scanResult.id, bookTitle:S.scanResult.title, qty:S.scanQty,
@@ -50,7 +51,7 @@ export function confirmScan() {
       normalPrice: normalP, sellPrice: normalP,
       finalPrice: finalP, finalSellPrice: finalP,
       cogs, profit: S.scanQty*finalP-cogs,
-      date:today(), via:'scan', priceOverride: isDiskon, note: S.scanOverNote
+      date, via:'scan', priceOverride: isDiskon, note: S.scanOverNote
     });
     showToast(`✓ ${S.scanResult.title} — ${S.scanQty} terjual`);
   } else {

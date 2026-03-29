@@ -18,7 +18,10 @@ export function openSaleManual() {
         ${S.books.filter(b=>totalStock(b)>0).map(b=>`<option value="${b.id}">${b.title} (stok: ${totalStock(b)})</option>`).join('')}
       </select>
     </div>
-    <div class="field"><label>Jumlah</label><input class="inp" id="f_qty" type="number" min="1" value="1" oninput="onSaleChange()" style="max-width:120px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field"><label>Jumlah</label><input class="inp" id="f_qty" type="number" min="1" value="1" oninput="onSaleChange()" style="max-width:120px"></div>
+      <div class="field"><label>Tanggal</label><input class="inp" id="f_date" type="date" value="${today()}" max="${today()}" style="max-width:180px"></div>
+    </div>
     <div id="price-section" style="display:none">
       <div class="override-panel">
         <div class="override-title">💰 Harga Jual</div>
@@ -161,8 +164,10 @@ export function onScanNoteInput(el) {
 export function saveSaleManual() {
   const bid  = +document.getElementById('f_bid')?.value;
   const qty  = +document.getElementById('f_qty')?.value;
+  const date = document.getElementById('f_date')?.value || today();
   if (!bid||!qty) { showToast('Lengkapi field!', 'err'); return; }
   if (qty <= 0) { showToast('Jumlah harus lebih dari 0', 'err'); return; }
+  if (!date) { showToast('Tanggal harus diisi', 'err'); return; }
   const book = S.books.find(b => b.id===bid);
   if (qty > totalStock(book)) { showToast('Stok tidak cukup!', 'err'); return; }
   const normalP   = getNormalPrice(book);
@@ -175,13 +180,13 @@ export function saveSaleManual() {
   const profit = qty * finP - cogs;
   S.sales.push({
     id:uid(), bookId:bid, bookTitle:book.title, qty,
-    buyPrice: Math.round(cogs/qty),   // HPP per pcs (FIFO)
-    normalPrice: normalP,              // harga normal (default jual)
-    sellPrice: normalP,                // alias
-    finalPrice: finP,                  // harga final / aktual transaksi
-    finalSellPrice: finP,              // alias lama
+    buyPrice: Math.round(cogs/qty),
+    normalPrice: normalP,
+    sellPrice: normalP,
+    finalPrice: finP,
+    finalSellPrice: finP,
     cogs, profit,
-    date:today(), via:'manual',
+    date, via:'manual',
     priceOverride: isDiskon,
     note
   });
@@ -262,6 +267,7 @@ export function changeScanBundleQty(bookId, delta) {
 export function confirmScanBundle() {
   const price = +document.getElementById('scan-bundle-price')?.value || 0;
   const note  = document.getElementById('scan-bundle-note')?.value?.trim() || '';
+  const date  = document.getElementById('scan-bundle-date')?.value || today();
   if (!S.scanBundleItems.length)  { showToast('Belum ada buku', 'err'); return; }
   if (!price)                    { showToast('Masukkan harga bundle', 'err'); return; }
   // Validasi stok
@@ -288,7 +294,7 @@ export function confirmScanBundle() {
     normalPrice: 0, sellPrice: 0,
     finalPrice: price, finalSellPrice: price,
     cogs: totalCogs, profit,
-    date: today(), via: 'scan',
+    date, via: 'scan',
     priceOverride: false, note,
     bundleItems: S.scanBundleItems.map(item => {
       const d = deductions.find(d => d.bookId === item.bookId);
@@ -368,11 +374,11 @@ export function renderBundleModal() {
       <div class="bundle-summary-bar" style="margin-top:12px">
         <div style="flex:1;font-size:12px">
           <div>Total normal: <strong>${fmt(totalNormal)}</strong></div>
-          <div style="color:var(--text3)">Total HPP modal: <strong>${fmt(totalHPP)}</strong></div>
+          <div style="color:var(--text3)">Total HPP modal: <strong id="bundle-hpp-display">${fmt(totalHPP)}</strong></div>
         </div>
         <div style="text-align:right;font-size:12px">
           <div style="color:var(--text3)">Profit bundle:</div>
-          <div style="font-size:16px;font-weight:700;color:${profit>=0?'var(--green)':'var(--red)'}">${fmt(profit)}</div>
+          <div id="bundle-profit-display" style="font-size:16px;font-weight:700;color:${profit>=0?'var(--green)':'var(--red)'}">${fmt(profit)}</div>
         </div>
       </div>
     </div>
@@ -391,6 +397,10 @@ export function renderBundleModal() {
         <input class="inp" id="bundle-note-input" value="${S.bundleNote}"
           placeholder="e.g. paket lebaran, bundel murid baru..."
           oninput="setBundleNote(this.value)">
+      </div>
+      <div class="field" style="margin-top:10px;margin-bottom:0">
+        <label>Tanggal</label>
+        <input class="inp" id="bundle-date-input" type="date" value="${today()}" max="${today()}" style="max-width:180px">
       </div>
     </div>` : `
     <div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;background:var(--bg);border-radius:var(--radius-s);margin-bottom:16px">
@@ -451,6 +461,7 @@ export function saveBundleSale() {
   }
   const profit   = S.bundlePrice - totalCogs;
   const note     = document.getElementById('bundle-note-input')?.value?.trim() || S.bundleNote || '';
+  const date     = document.getElementById('bundle-date-input')?.value || today();
   const bundleId = 'b_' + uid();
 
   S.sales.push({
@@ -470,7 +481,7 @@ export function saveBundleSale() {
     finalSellPrice: S.bundlePrice,
     cogs:           totalCogs,
     profit,
-    date:           today(),
+    date:           date,
     via:            'manual',
     priceOverride:  false,
     note,
