@@ -71,8 +71,13 @@ let _searchBuf = '', _searchBufTime = 0;
 
 export function onSearchInput(el) {
   clearTimeout(S.searchDebounceTimer);
+  const pos = el.selectionStart;
   S.set.stokSearch(el.value);
-  S.set.searchDebounceTimer(setTimeout(() => _render(), 150));
+  S.set.searchDebounceTimer(setTimeout(() => {
+    _render();
+    const inp = document.getElementById('stok-search-input');
+    if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
+  }, 150));
 }
 
 export function onSearchKeydown(el, e) {
@@ -96,8 +101,13 @@ export function onSearchKeydown(el, e) {
   }
   if (now - _searchBufTime < 60) {
     clearTimeout(S.searchDebounceTimer);
+    const pos2 = el.selectionStart;
     S.set.stokSearch(el.value);
-    S.set.searchDebounceTimer(setTimeout(() => _render(), 80));
+    S.set.searchDebounceTimer(setTimeout(() => {
+      _render();
+      const inp = document.getElementById('stok-search-input');
+      if (inp) { inp.focus(); inp.setSelectionRange(pos2, pos2); }
+    }, 80));
   }
   _searchBufTime = now;
 }

@@ -124,7 +124,14 @@ Object.assign(window, {
   bundleRemoveItem:   Sales.bundleRemoveItem,
   bundleChangeQty:    Sales.bundleChangeQty,
   saveBundleSale:     Sales.saveBundleSale,
-  setBundlePrice(v)   { S.set.bundlePrice(v); Sales.renderBundleModal(); },
+  setBundlePrice(v)   {
+    const inp = document.getElementById('bundle-price-input');
+    const pos = inp ? inp.selectionStart : 0;
+    S.set.bundlePrice(v);
+    Sales.renderBundleModal();
+    const inp2 = document.getElementById('bundle-price-input');
+    if (inp2) { inp2.focus(); inp2.setSelectionRange(pos, pos); }
+  },
   setBundleNote(v)    { S.set.bundleNote(v); },
 
   // Scanner bundle
