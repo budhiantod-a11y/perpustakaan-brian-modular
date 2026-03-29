@@ -4,7 +4,11 @@
 
 // ── Core data ────────────────────────────────────────────────────────────────
 export let books = [], sales = [], restocks = [];
-export let period = { from: new Date().toISOString().slice(0,7)+'-01', to: new Date().toISOString().slice(0,10) };
+function localDate() {
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+export let period = { from: localDate().slice(0,7)+'-01', to: localDate() };
 
 // ── UI / Scanner / Import / Bundle state ─────────────────────────────────────
 export let currentTab = 'dashboard';

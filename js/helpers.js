@@ -4,7 +4,7 @@
 import { books } from './state.js';
 
 export const fmt = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n);
-export const today = () => new Date().toISOString().slice(0,10);
+export const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 export const uid = () => Date.now() + Math.floor(Math.random()*1000);
 export const getNormalPrice = b => b.normalPrice || b.sellPrice || 0;
 export const allPubs = () => [...new Set(books.map(b=>b.publisher).filter(Boolean))].sort();
