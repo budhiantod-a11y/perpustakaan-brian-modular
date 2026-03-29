@@ -11,6 +11,20 @@ export function render() {
   const txt  = document.getElementById('low-text');
   if (pill && txt) { pill.classList.toggle('show', lowStock.length > 0); txt.textContent = `${lowStock.length} buku hampir habis`; }
 
+  // Helper: truncate bundle title for mobile-friendly display
+  const bundleShort = (x) => {
+    if (!x.bundleItems || !x.bundleItems.length) return x.bookTitle;
+    const first = x.bundleItems[0];
+    const rest = x.bundleItems.length - 1;
+    return rest > 0
+      ? `${first.bookTitle} ×${first.qty} <span style="color:var(--text3)">+${rest} lainnya</span>`
+      : `${first.bookTitle} ×${first.qty}`;
+  };
+  const bundleFull = (x) => {
+    if (!x.bundleItems || !x.bundleItems.length) return x.bookTitle;
+    return x.bundleItems.map(i => `${i.bookTitle} ×${i.qty}`).join(' + ');
+  };
+
   const filtered = S.sales.filter(s => s.date >= S.period.from && s.date <= S.period.to);
   const totalRev  = filtered.reduce((s,x) => x.isBundle ? s + (x.finalPrice||x.finalSellPrice||0) : s + x.qty*(x.finalPrice||x.finalSellPrice||0), 0);
   const totalCOGS = filtered.reduce((s,x) => s + x.cogs, 0);
@@ -36,7 +50,12 @@ export function render() {
 
       <div class="save-notice"><div class="save-dot"></div>Data tersimpan di browser ini · <strong style="color:var(--text2)">${S.books.length} buku</strong> terdaftar</div>
 
-      ${lowStock.length ? `<div class="alert-bar">⚠ Stok hampir habis: ${lowStock.slice(0,3).map(b=>`<strong>${b.title}</strong> (${totalStock(b)} pcs)`).join(', ')}${lowStock.length > 3 ? ` <span style="color:var(--text2)">dan <strong>${lowStock.length - 3} buku lainnya</strong></span>` : ''}</div>` : ''}
+      ${lowStock.length ? `<div class="alert-bar">
+        <span style="flex-shrink:0">⚠ Stok hampir habis:</span>
+        <div class="low-stock-chips">
+          ${lowStock.map(b=>`<span class="low-chip">${b.title} <strong>(${totalStock(b)})</strong></span>`).join('')}
+        </div>
+      </div>` : ''}
 
       <div class="stat-grid">
         <div class="stat-card">
@@ -68,14 +87,14 @@ export function render() {
       <div class="card">
         <div class="card-title">Transaksi Terakhir</div>
         ${filtered.length === 0 ? `<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px">Belum ada transaksi di periode ini</div>` : `
-        <div class="table-wrap">
+        <div class="table-wrap hide-mobile">
           <table>
             <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty</th><th>Harga Final</th><th>Profit</th><th>Via</th></tr></thead>
             <tbody>
               ${[...filtered].reverse().slice(0,7).map(x => `
                 <tr class="${x.isBundle?'bundle-row':''}">
                   <td style="color:var(--text3)">${x.date}</td>
-                  <td style="font-weight:600">${x.isBundle?`<span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span>`:''}<span style="color:${x.isBundle?'#7c3aed':'inherit'}">${x.isBundle&&x.bundleItems?x.bundleItems.map(i=>`${i.bookTitle} ×${i.qty}`).join(' + '):x.bookTitle}</span></td>
+                  <td style="font-weight:600">${x.isBundle?`<span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span>`:''}<span style="color:${x.isBundle?'#7c3aed':'inherit'}">${x.isBundle ? bundleShort(x) : x.bookTitle}</span></td>
                   <td>${x.qty}</td>
                   <td>${x.isBundle
                     ? `<strong style="color:#7c3aed">${fmt(x.finalPrice||x.finalSellPrice)}</strong>`
@@ -87,6 +106,21 @@ export function render() {
                 </tr>`).join('')}
             </tbody>
           </table>
+        </div>
+        <div class="mobile-cards show-mobile">
+          ${[...filtered].reverse().slice(0,7).map(x => `
+            <div class="trx-card ${x.isBundle?'trx-bundle':''}">
+              <div class="trx-card-top">
+                <span class="trx-card-title">${x.isBundle ? `📦 Bundle (${x.qty} buku)` : x.bookTitle}${!x.isBundle && x.qty>1 ? ` ×${x.qty}` : ''}</span>
+                <span class="trx-card-date">${x.date}</span>
+              </div>
+              ${x.isBundle ? `<div class="trx-card-detail">${bundleShort(x)}</div>` : ''}
+              <div class="trx-card-bottom">
+                <span class="trx-card-price" style="color:${x.isBundle?'#7c3aed':x.priceOverride?'var(--orange)':'var(--text)'}">${fmt(x.finalPrice||x.finalSellPrice)}</span>
+                <span class="trx-card-profit">+${fmt(x.profit)}</span>
+                <span class="badge ${x.via==='scan'?'badge-accent':'badge-gray'}" style="font-size:10px">${x.via}</span>
+              </div>
+            </div>`).join('')}
         </div>`}
       </div>`;
   }
@@ -574,13 +608,10 @@ export function render() {
             <tbody>
               ${[...S.sales].reverse().map(x => {
                 if (x.isBundle) {
-                  const bundleTitleStr = x.bundleItems
-                    ? x.bundleItems.map(i=>`${i.bookTitle} ×${i.qty}`).join(' + ')
-                    : x.bookTitle;
                   return `
                     <tr class="bundle-row">
                       <td style="color:var(--text3);white-space:nowrap">${x.date}</td>
-                      <td><span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span><strong style="color:#7c3aed">${bundleTitleStr}</strong></td>
+                      <td><span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span><strong style="color:#7c3aed" title="${bundleFull(x)}">${bundleShort(x)}</strong></td>
                       <td style="color:#7c3aed;font-size:12px">${x.qty} buku</td>
                       <td style="color:var(--text2);font-size:12px">${fmt(Math.round((x.cogs||0)/(x.qty||1)))}</td>
                       <td><strong style="color:#7c3aed">${fmt(x.finalPrice||x.finalSellPrice)}</strong></td>
@@ -707,7 +738,7 @@ export function render() {
             <tbody>
               ${[...bundles].reverse().map(x=>`<tr>
                 <td style="color:var(--text3)">${x.date}</td>
-                <td style="font-size:12px;color:#7c3aed">${x.bundleItems?x.bundleItems.map(i=>`${i.bookTitle} ×${i.qty}`).join(', '):x.bookTitle}</td>
+                <td style="font-size:12px;color:#7c3aed" title="${x.bundleItems?bundleFull(x):x.bookTitle}">${x.bundleItems?bundleShort(x):x.bookTitle}</td>
                 <td>${x.qty}</td>
                 <td style="color:var(--text2)">${fmt(x.cogs||0)}</td>
                 <td style="font-weight:600;color:#7c3aed">${fmt(x.finalPrice||x.finalSellPrice)}</td>
