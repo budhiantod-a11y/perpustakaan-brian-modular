@@ -625,7 +625,7 @@ export function render() {
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty Masuk</th><th>Harga Beli</th><th>Total Modal</th></tr></thead>
+            <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty Masuk</th><th>Harga Beli</th><th>Total Modal</th><th></th></tr></thead>
             <tbody>
               ${[...S.restocks].reverse().map(x => `
                 <tr>
@@ -634,6 +634,7 @@ export function render() {
                   <td><span class="badge badge-blue">+${x.qty}</span></td>
                   <td>${fmt(x.buyPrice)}</td>
                   <td style="font-weight:600">${fmt(x.qty*x.buyPrice)}</td>
+                  <td><button class="btn btn-danger btn-xs" onclick="deleteRestock(${x.id})">Hapus</button></td>
                 </tr>`).join('')}
             </tbody>
           </table>
@@ -703,7 +704,7 @@ export function render() {
           <table>
             <thead><tr><th>Tanggal</th><th>Isi Bundle</th><th>Total Buku</th><th>HPP Modal</th><th>Harga Jual</th><th>Profit</th><th>Catatan</th></tr></thead>
             <tbody>
-              ${bundles.map(x=>`<tr>
+              ${[...bundles].reverse().map(x=>`<tr>
                 <td style="color:var(--text3)">${x.date}</td>
                 <td style="font-size:12px;color:#7c3aed">${x.bundleItems?x.bundleItems.map(i=>`${i.bookTitle} ×${i.qty}`).join(', '):x.bookTitle}</td>
                 <td>${x.qty}</td>
@@ -724,7 +725,7 @@ export function render() {
           <table>
             <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty</th><th>Modal/pcs</th><th>Harga Final</th><th>Selisih vs Normal</th><th>Catatan</th></tr></thead>
             <tbody>
-              ${overrides.map(x => {
+              ${[...overrides].reverse().map(x => {
                 const normP = x.normalPrice||x.sellPrice||0;
                 const finP  = x.finalPrice||x.finalSellPrice||0;
                 const diff  = x.qty*(finP-normP);

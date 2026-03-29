@@ -32,14 +32,14 @@ export function openAddBook() {
       <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💰 Harga</div>
       <div class="inp-grid-2">
         <div class="field" style="margin-bottom:0">
-          <label>Harga Modal / Beli (Rp) *</label>
+          <label>Harga Modal / Beli (Rp)</label>
           <input class="inp" id="f_bp" type="number" placeholder="0">
-          <div class="hint">Harga beli pertama kali</div>
+          <div class="hint">Harga beli pertama kali (opsional)</div>
         </div>
         <div class="field" style="margin-bottom:0">
-          <label>Harga Normal / Jual (Rp) *</label>
+          <label>Harga Normal / Jual (Rp)</label>
           <input class="inp" id="f_sell" type="number" placeholder="0">
-          <div class="hint">Default harga jual ke pembeli</div>
+          <div class="hint">Default harga jual ke pembeli (opsional)</div>
         </div>
       </div>
     </div>
@@ -89,11 +89,11 @@ export function openEditBook(bookId) {
 // ── Save New Book ────────────────────────────────────────────────────────────
 export function saveBook() {
   const v = k => document.getElementById('f_'+k)?.value?.trim();
-  if (!v('title')||!v('barcode')||!v('sell')||!v('bp')) { showToast('Lengkapi field wajib (judul, barcode, harga modal, harga normal)!', 'err'); return; }
+  if (!v('title')||!v('barcode')) { showToast('Lengkapi field wajib (judul dan barcode)!', 'err'); return; }
   if (S.books.find(b => b.barcode===v('barcode'))) { showToast('Barcode sudah ada!', 'err'); return; }
-  const normalP = +v('sell');
+  const normalP = +v('sell')||0;
   const buyP    = +v('bp')||0;
-  if (normalP <= 0) { showToast('Harga normal harus lebih dari 0', 'err'); return; }
+  if (normalP < 0) { showToast('Harga normal tidak boleh negatif', 'err'); return; }
   if (buyP < 0) { showToast('Harga modal tidak boleh negatif', 'err'); return; }
   if (+v('stock') < 0) { showToast('Stok awal tidak boleh negatif', 'err'); return; }
   const book = { id:uid(), barcode:v('barcode'), title:v('title'), author:v('author'), publisher:v('publisher'), category:v('category'), normalPrice:normalP, sellPrice:normalP, batches:[] };
@@ -163,4 +163,19 @@ export function deleteBook(bookId) {
   if (!confirm(msg)) return;
   S.set.books(S.books.filter(b => b.id !== bookId));
   S.save(); showToast('Buku dihapus'); _render();
+}
+
+// ── Delete Restock ───────────────────────────────────────────────────────────
+export function deleteRestock(restockId) {
+  const restock = S.restocks.find(r => r.id === restockId);
+  if (!restock) return;
+  const book = S.books.find(b => b.id === restock.bookId);
+  if (!confirm(`Hapus restock "${restock.bookTitle}" (+${restock.qty} pcs, ${fmt(restock.buyPrice)}/pcs)?\n\nStok batch terkait akan dihapus.`)) return;
+  // Hapus batch yang matching dari book
+  if (book) {
+    const bIdx = book.batches.findIndex(bt => bt.qty === restock.qty && bt.buyPrice === restock.buyPrice && bt.date === restock.date);
+    if (bIdx !== -1) book.batches.splice(bIdx, 1);
+  }
+  S.set.restocks(S.restocks.filter(r => r.id !== restockId));
+  S.save(); showToast('Restock dihapus · stok dikurangi'); _render();
 }
