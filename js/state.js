@@ -129,7 +129,7 @@ export async function loadFromSheets() {
         ...s, id: num(s.id)||s.id, bookId: s.bookId ? num(s.bookId) : null,
         qty: num(s.qty), buyPrice: num(s.buyPrice), normalPrice: num(s.normalPrice), sellPrice: num(s.sellPrice),
         finalPrice: num(s.finalPrice), finalSellPrice: num(s.finalSellPrice), cogs: num(s.cogs), profit: num(s.profit),
-        priceOverride: s.priceOverride===true||s.priceOverride==='TRUE'||s.priceOverride==='true',
+        priceOverride: s.priceOverride===true||s.priceOverride==='TRUE'||s.priceOverride==='true'||(!!(s.bundleId)?false:(num(s.normalPrice)>0&&num(s.finalPrice)!==num(s.normalPrice))),
         isBundle: s.isBundle===true||s.isBundle==='TRUE'||s.isBundle==='true'||!!(s.bundleId),
         date: fixDate(s.date),
         bundleItems: (s.bundleItems||[]).map(i => ({ ...i, bookId: num(i.bookId)||i.bookId, qty: num(i.qty), cogs: num(i.cogs), buyPrice: num(i.buyPrice) })),
@@ -194,7 +194,7 @@ export async function fetchFromSheetsOnBoot() {
         finalSellPrice: num(s.finalSellPrice),
         cogs: num(s.cogs),
         profit: num(s.profit),
-        priceOverride: s.priceOverride === true || s.priceOverride === 'TRUE' || s.priceOverride === 'true',
+        priceOverride: s.priceOverride === true || s.priceOverride === 'TRUE' || s.priceOverride === 'true' || (!!(s.bundleId) ? false : (num(s.normalPrice) > 0 && num(s.finalPrice) !== num(s.normalPrice))),
         isBundle: s.isBundle === true || s.isBundle === 'TRUE' || s.isBundle === 'true' || !!(s.bundleId),
         date: fixDate(s.date),
         bundleItems: (s.bundleItems||[]).map(i => ({
