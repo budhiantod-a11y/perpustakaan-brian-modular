@@ -130,7 +130,7 @@ export async function loadFromSheets() {
         qty: num(s.qty), buyPrice: num(s.buyPrice), normalPrice: num(s.normalPrice), sellPrice: num(s.sellPrice),
         finalPrice: num(s.finalPrice), finalSellPrice: num(s.finalSellPrice), cogs: num(s.cogs), profit: num(s.profit),
         priceOverride: s.priceOverride===true||s.priceOverride==='TRUE'||s.priceOverride==='true',
-        isBundle: s.isBundle===true||s.isBundle==='TRUE'||s.isBundle==='true',
+        isBundle: s.isBundle===true||s.isBundle==='TRUE'||s.isBundle==='true'||!!(s.bundleId),
         date: fixDate(s.date),
         bundleItems: (s.bundleItems||[]).map(i => ({ ...i, bookId: num(i.bookId)||i.bookId, qty: num(i.qty), cogs: num(i.cogs), buyPrice: num(i.buyPrice) })),
       }));
@@ -195,7 +195,7 @@ export async function fetchFromSheetsOnBoot() {
         cogs: num(s.cogs),
         profit: num(s.profit),
         priceOverride: s.priceOverride === true || s.priceOverride === 'TRUE' || s.priceOverride === 'true',
-        isBundle: s.isBundle === true || s.isBundle === 'TRUE' || s.isBundle === 'true',
+        isBundle: s.isBundle === true || s.isBundle === 'TRUE' || s.isBundle === 'true' || !!(s.bundleId),
         date: fixDate(s.date),
         bundleItems: (s.bundleItems||[]).map(i => ({
           ...i,
