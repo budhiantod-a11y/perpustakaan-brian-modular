@@ -7,7 +7,7 @@
 
 import * as S from './state.js';
 import { showToast, closeModal, fmt } from './helpers.js';
-import { totalStock } from './fifo.js';
+import { totalStock, fifoSim } from './fifo.js';
 import { render } from './render.js';
 
 import * as Books from './books.js';
@@ -125,12 +125,24 @@ Object.assign(window, {
   bundleChangeQty:    Sales.bundleChangeQty,
   saveBundleSale:     Sales.saveBundleSale,
   setBundlePrice(v)   {
-    const inp = document.getElementById('bundle-price-input');
-    const pos = inp ? inp.selectionStart : 0;
     S.set.bundlePrice(v);
-    Sales.renderBundleModal();
-    const inp2 = document.getElementById('bundle-price-input');
-    if (inp2) { inp2.focus(); inp2.setSelectionRange(pos, pos); }
+    // Update profit display in-place (no modal rebuild = no cursor jump)
+    const profitEl = document.getElementById('bundle-profit-display');
+    const hppEl    = document.getElementById('bundle-hpp-display');
+    if (profitEl && hppEl) {
+      // Recalculate totalHPP from current bundle items
+      let totalHPP = 0;
+      for (const item of S.bundleItems) {
+        const b = S.books.find(x => x.id === item.bookId);
+        if (b) {
+          const { cogs } = fifoSim(b, item.qty);
+          totalHPP += cogs;
+        }
+      }
+      const profit = v - totalHPP;
+      profitEl.textContent = fmt(profit);
+      profitEl.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+    }
   },
   setBundleNote(v)    { S.set.bundleNote(v); },
 
