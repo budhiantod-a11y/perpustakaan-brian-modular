@@ -422,6 +422,38 @@ tbody tr:hover { background: var(--surface2); }
 .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink:0; }
 .sync-dot.pulse { animation: pulse 1.5s infinite; }
 
+/* ── SYNC BANNER (Phase 2) ── */
+.sync-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all .3s;
+}
+.sync-banner.syncing {
+  background: var(--accent-s);
+  color: var(--accent);
+  border-bottom: 1px solid var(--accent-t);
+}
+.sync-banner.synced {
+  background: var(--green-s);
+  color: var(--green);
+  border-bottom: 1px solid #bbf7d0;
+}
+.sync-banner.error {
+  background: var(--amber-s);
+  color: var(--amber);
+  border-bottom: 1px solid #fed7aa;
+}
+.sync-banner-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1s infinite;
+}
+
 .gs-setup-banner {
   background: #fff7ed;
   border: 1px solid #fed7aa;
