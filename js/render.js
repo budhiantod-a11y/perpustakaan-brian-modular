@@ -566,7 +566,7 @@ export function render() {
           <table>
             <thead><tr><th>Tanggal</th><th>Buku / Bundle</th><th>Qty</th><th>Modal/pcs</th><th>Harga Final</th><th>Profit</th><th>Via</th><th>Catatan</th><th></th></tr></thead>
             <tbody>
-              ${[...sales].reverse().map(x => {
+              ${[...S.sales].reverse().map(x => {
                 if (x.isBundle) {
                   const bundleTitleStr = x.bundleItems
                     ? x.bundleItems.map(i=>`${i.bookTitle} ×${i.qty}`).join(' + ')
@@ -622,7 +622,7 @@ export function render() {
           <table>
             <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty Masuk</th><th>Harga Beli</th><th>Total Modal</th></tr></thead>
             <tbody>
-              ${[...restocks].reverse().map(x => `
+              ${[...S.restocks].reverse().map(x => `
                 <tr>
                   <td style="color:var(--text3)">${x.date}</td>
                   <td style="font-weight:600">${x.bookTitle}</td>
