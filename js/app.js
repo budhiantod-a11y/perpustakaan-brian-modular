@@ -123,7 +123,8 @@ Object.assign(window, {
   // Bundle
   openBundleModal:    Sales.openBundleModal,
   renderBundleModal:  Sales.renderBundleModal,
-  bundleAddItem:      Sales.bundleAddItem,
+  bundleSearchFilter: Sales.bundleSearchFilter,
+  bundleAddById:      Sales.bundleAddById,
   bundleRemoveItem:   Sales.bundleRemoveItem,
   bundleChangeQty:    Sales.bundleChangeQty,
   saveBundleSale:     Sales.saveBundleSale,
@@ -131,9 +132,7 @@ Object.assign(window, {
     S.set.bundlePrice(v);
     // Update profit display in-place (no modal rebuild = no cursor jump)
     const profitEl = document.getElementById('bundle-profit-display');
-    const hppEl    = document.getElementById('bundle-hpp-display');
-    if (profitEl && hppEl) {
-      // Recalculate totalHPP from current bundle items
+    if (profitEl) {
       let totalHPP = 0;
       for (const item of S.bundleItems) {
         const b = S.books.find(x => x.id === item.bookId);
@@ -145,6 +144,14 @@ Object.assign(window, {
       const profit = v - totalHPP;
       profitEl.textContent = fmt(profit);
       profitEl.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    // Update submit button disabled state
+    const btn = document.getElementById('bundle-submit-btn');
+    if (btn) {
+      const canSubmit = S.bundleItems.length && v > 0;
+      btn.disabled = !canSubmit;
+      btn.style.opacity = canSubmit ? '' : '.5';
+      btn.style.cursor = canSubmit ? '' : 'not-allowed';
     }
   },
   setBundleNote(v)    { S.set.bundleNote(v); },

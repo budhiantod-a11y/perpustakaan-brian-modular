@@ -330,20 +330,17 @@ export function renderBundleModal() {
     const b = S.books.find(x => x.id === item.bookId);
     return b && totalStock(b) >= item.qty;
   });
-  const booksAvail = S.books.filter(b => totalStock(b) > 0);
+  const canSubmit = S.bundleItems.length && S.bundlePrice && hasStock;
 
   openModal(`
     <div class="modal-title">📦 Catat Penjualan Bundling</div>
 
     <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Pilih buku yang dibundling:</div>
-      <select class="inp" id="bundle-book-select" style="margin-bottom:8px">
-        <option value="">— Pilih buku untuk ditambahkan —</option>
-        ${booksAvail.map(b=>`<option value="${b.id}">${b.title} · stok ${totalStock(b)} · ${fmt(getNormalPrice(b))}</option>`).join('')}
-      </select>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="number" class="inp" id="bundle-qty-input" value="1" min="1" style="width:80px" placeholder="Qty">
-        <button class="btn btn-ghost btn-sm" onclick="bundleAddItem()">+ Tambah</button>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Cari buku untuk ditambahkan:</div>
+      <div style="position:relative">
+        <input class="inp" id="bundle-search-input" type="text" placeholder="Ketik judul buku..." autocomplete="off"
+          oninput="bundleSearchFilter(this.value)">
+        <div id="bundle-search-results" style="position:absolute;left:0;right:0;top:100%;z-index:10;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-s) var(--radius-s);display:none;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
       </div>
     </div>
 
@@ -404,31 +401,57 @@ export function renderBundleModal() {
       </div>
     </div>` : `
     <div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;background:var(--bg);border-radius:var(--radius-s);margin-bottom:16px">
-      📦 Belum ada buku dipilih.<br>Pilih buku dari dropdown di atas lalu klik + Tambah.
+      📦 Belum ada buku dipilih.<br>Ketik judul buku di search box di atas untuk menambahkan.
     </div>`}
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary"
-        ${!S.bundleItems.length || !S.bundlePrice || !hasStock ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}
+      <button class="btn btn-primary" id="bundle-submit-btn"
+        ${!canSubmit ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}
         onclick="saveBundleSale()">
         ✓ Simpan Bundle (${S.bundleItems.reduce((s,i)=>s+i.qty,0)} buku)
       </button>
     </div>`);
 }
 
-export function bundleAddItem() {
-  const sel  = document.getElementById('bundle-book-select');
-  const qtyEl = document.getElementById('bundle-qty-input');
-  const bookId = +sel.value;
-  const qty    = +qtyEl.value || 1;
-  if (!bookId) { showToast('Pilih buku dulu', 'err'); return; }
+// ── Bundle search + add ──────────────────────────────────────────────────────
+export function bundleSearchFilter(query) {
+  const resultsEl = document.getElementById('bundle-search-results');
+  if (!resultsEl) return;
+  const q = query.toLowerCase().trim();
+  if (!q || q.length < 1) { resultsEl.style.display = 'none'; return; }
+  const matches = S.books
+    .filter(b => totalStock(b) > 0)
+    .filter(b => [b.title, b.author, b.barcode, b.publisher].some(v => v?.toLowerCase().includes(q)))
+    .slice(0, 6);
+  if (!matches.length) {
+    resultsEl.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--text3)">Tidak ditemukan</div>`;
+    resultsEl.style.display = 'block';
+    return;
+  }
+  resultsEl.innerHTML = matches.map(b => `
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
+      onclick="bundleAddById(${b.id})">
+      <div>
+        <div style="font-weight:600;font-size:13px">${b.title}</div>
+        <div style="font-size:11px;color:var(--text3)">Stok: ${totalStock(b)} · ${fmt(getNormalPrice(b))}</div>
+      </div>
+      <span style="font-size:11px;color:var(--accent);background:var(--accent-s);padding:2px 8px;border-radius:12px;white-space:nowrap">+ Tambah</span>
+    </div>`).join('');
+  resultsEl.style.display = 'block';
+}
+
+export function bundleAddById(bookId) {
   const existing = S.bundleItems.find(i => i.bookId === bookId);
-  if (existing) { existing.qty += qty; }
-  else { S.bundleItems.push({ bookId, qty }); }
-  sel.value   = '';
-  qtyEl.value = 1;
+  if (existing) { existing.qty += 1; }
+  else { S.bundleItems.push({ bookId, qty: 1 }); }
   renderBundleModal();
+  // Re-focus search after modal rebuild
+  setTimeout(() => {
+    const inp = document.getElementById('bundle-search-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+  }, 50);
 }
 
 export function bundleRemoveItem(idx) {
