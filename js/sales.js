@@ -13,10 +13,14 @@ export function openSaleManual() {
     <div class="modal-title">Catat Penjualan</div>
     <div class="field">
       <label>Pilih Buku</label>
-      <select class="inp" id="f_bid" onchange="onBookChange()">
-        <option value="">— Pilih buku —</option>
-        ${S.books.filter(b=>totalStock(b)>0).map(b=>`<option value="${b.id}">${b.title} (stok: ${totalStock(b)})</option>`).join('')}
-      </select>
+      <input type="hidden" id="f_bid" value="">
+      <div style="position:relative">
+        <input class="inp" id="sale-search-input" type="text" placeholder="Ketik judul buku..." autocomplete="off"
+          oninput="saleSearchFilter(this.value)">
+        <div id="sale-search-results" style="position:absolute;left:0;right:0;top:100%;z-index:10;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-s) var(--radius-s);display:none;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+      </div>
+      <div id="sale-selected-book" style="display:none;margin-top:8px;padding:8px 12px;background:var(--accent-s);border:1px solid var(--accent-t);border-radius:var(--radius-s);font-size:13px;display:none">
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="field"><label>Jumlah</label><input class="inp" id="f_qty" type="number" min="1" value="1" oninput="onSaleChange()" style="max-width:120px"></div>
@@ -56,6 +60,67 @@ export function openSaleManual() {
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
       <button class="btn btn-primary" onclick="saveSaleManual()">Simpan Penjualan</button>
     </div>`);
+}
+
+// ── Sale search + select ─────────────────────────────────────────────────────
+export function saleSearchFilter(query) {
+  const resultsEl = document.getElementById('sale-search-results');
+  if (!resultsEl) return;
+  const q = query.toLowerCase().trim();
+  if (!q) { resultsEl.style.display = 'none'; return; }
+  const matches = S.books
+    .filter(b => totalStock(b) > 0)
+    .filter(b => [b.title, b.author, b.barcode, b.publisher].some(v => v?.toLowerCase().includes(q)))
+    .slice(0, 6);
+  if (!matches.length) {
+    resultsEl.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--text3)">Tidak ditemukan</div>`;
+    resultsEl.style.display = 'block';
+    return;
+  }
+  resultsEl.innerHTML = matches.map(b => `
+    <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
+      onclick="saleSelectBook(${b.id})">
+      <div>
+        <div style="font-weight:600;font-size:13px">${b.title}</div>
+        <div style="font-size:11px;color:var(--text3)">Stok: ${totalStock(b)} · ${fmt(getNormalPrice(b))}</div>
+      </div>
+      <span style="font-size:11px;color:var(--accent);background:var(--accent-s);padding:2px 8px;border-radius:12px;white-space:nowrap">Pilih</span>
+    </div>`).join('');
+  resultsEl.style.display = 'block';
+}
+
+export function saleSelectBook(bookId) {
+  const book = S.books.find(b => b.id === bookId);
+  if (!book) return;
+  // Set hidden input
+  document.getElementById('f_bid').value = bookId;
+  // Update search input to show selected book
+  const searchInp = document.getElementById('sale-search-input');
+  if (searchInp) { searchInp.value = book.title; searchInp.style.borderColor = 'var(--accent)'; searchInp.style.background = 'var(--accent-s)'; }
+  // Hide results
+  const resultsEl = document.getElementById('sale-search-results');
+  if (resultsEl) resultsEl.style.display = 'none';
+  // Show selected badge
+  const selEl = document.getElementById('sale-selected-book');
+  if (selEl) {
+    selEl.style.display = 'flex';
+    selEl.innerHTML = `<div style="flex:1"><strong>${book.title}</strong> · Stok: ${totalStock(book)} · ${fmt(getNormalPrice(book))}</div><span style="cursor:pointer;color:var(--accent);font-size:12px" onclick="saleClearBook()">✕ Ganti</span>`;
+  }
+  // Trigger price section
+  onBookChange();
+}
+
+export function saleClearBook() {
+  document.getElementById('f_bid').value = '';
+  const searchInp = document.getElementById('sale-search-input');
+  if (searchInp) { searchInp.value = ''; searchInp.style.borderColor = ''; searchInp.style.background = ''; searchInp.focus(); }
+  const selEl = document.getElementById('sale-selected-book');
+  if (selEl) selEl.style.display = 'none';
+  const sec = document.getElementById('price-section');
+  if (sec) sec.style.display = 'none';
+  const pv = document.getElementById('sale-preview');
+  if (pv) pv.style.display = 'none';
 }
 
 export function onBookChange() {

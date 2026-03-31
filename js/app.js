@@ -112,6 +112,9 @@ Object.assign(window, {
 
   // Sales
   openSaleManual:    Sales.openSaleManual,
+  saleSearchFilter:  Sales.saleSearchFilter,
+  saleSelectBook:    Sales.saleSelectBook,
+  saleClearBook:     Sales.saleClearBook,
   onBookChange:      Sales.onBookChange,
   onSaleChange:      Sales.onSaleChange,
   onScanPriceInput:  Sales.onScanPriceInput,
