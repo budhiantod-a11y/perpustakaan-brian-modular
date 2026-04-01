@@ -46,12 +46,14 @@ function sanitizePreorder(po) {
   return {
     id:          String(po.id || ''),
     publisher:   String(po.publisher || ''),
-    openDate:    po.openDate  || null,
-    closeDate:   po.closeDate || null,
-    readyDate:   po.readyDate || null,
-    dueDate:     po.dueDate   || null,
+    openDate:    po.openDate    || null,
+    closeDate:   po.closeDate   || null,
+    readyDate:   po.readyDate   || null,
+    dueDate:     po.dueDate     || null,
     paidAmount:  Number(po.paidAmount) || 0,
     bookArrived: Boolean(po.bookArrived),
+    lastPayDate: po.lastPayDate || null,
+    paymentLog:  (po.paymentLog || []).map(p => ({ amount: Number(p.amount)||0, date: String(p.date||'') })),
     items: (po.items || []).map(i => ({
       id:          String(i.id || ''),
       title:       String(i.title || ''),
