@@ -4,6 +4,7 @@
 import * as S from './state.js';
 import { fmt, today, getNormalPrice, allPubs, allCats } from './helpers.js';
 import { totalStock, fifoSim } from './fifo.js';
+import { getPoStatus, getPoTotal, getStatusLabel } from './preorder.js';
 
 export function render() {
   const lowStock = S.books.filter(b => totalStock(b) <= 5);
@@ -581,32 +582,39 @@ export function render() {
 
   // ── PENJUALAN ──────────────────────────────────────────────────────────────
   if (S.currentTab === 'penjualan') {
+    const penjualanFiltered = S.sales.filter(s => s.date >= S.period.from && s.date <= S.period.to);
     area.innerHTML = `
       <div class="page-hdr">
-        <div><div class="page-title">Riwayat Penjualan</div><div class="page-sub">${S.sales.length} transaksi · ${S.sales.filter(s=>s.isBundle).length} bundling · ${S.sales.filter(s=>s.priceOverride&&!s.isBundle).length} diskon · hapus = stok kembali</div></div>
+        <div><div class="page-title">Riwayat Penjualan</div><div class="page-sub">${penjualanFiltered.length} transaksi periode ini · hapus = stok kembali</div></div>
         <div class="page-actions">
           <button class="btn btn-ghost" onclick="openSaleManual()">+ Catat Manual</button>
           <button class="btn btn-ghost" onclick="openBundleModal()" style="background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff">📦 Bundling</button>
           <button class="btn btn-primary" onclick="goTab('scanner')">⌖ Scanner</button>
         </div>
       </div>
-      ${S.sales.length === 0 ? `
+      <div class="period-bar" style="margin-bottom:16px">
+        <label>Periode</label>
+        <input type="date" value="${S.period.from}" onchange="setPeriodFrom(this.value)">
+        <span class="period-sep">—</span>
+        <input type="date" value="${S.period.to}" onchange="setPeriodTo(this.value)">
+      </div>
+      ${penjualanFiltered.length === 0 ? `
         <div class="card" style="text-align:center;padding:48px 24px">
           <div style="font-size:36px;margin-bottom:12px">💳</div>
-          <div style="font-size:15px;font-weight:600;margin-bottom:6px">Belum ada transaksi</div>
-          <div style="font-size:13px;color:var(--text3);margin-bottom:20px">Catat penjualan manual atau gunakan scanner</div>
-          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <div style="font-size:15px;font-weight:600;margin-bottom:6px">${S.sales.length === 0 ? 'Belum ada transaksi' : 'Tidak ada transaksi di periode ini'}</div>
+          <div style="font-size:13px;color:var(--text3);margin-bottom:20px">${S.sales.length === 0 ? 'Catat penjualan manual atau gunakan scanner' : 'Coba ubah rentang tanggal di atas'}</div>
+          ${S.sales.length === 0 ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
             <button class="btn btn-ghost" onclick="openSaleManual()">+ Catat Manual</button>
             <button class="btn btn-ghost" onclick="openBundleModal()" style="background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff">📦 Bundling</button>
             <button class="btn btn-primary" onclick="goTab('scanner')">⌖ Buka Scanner</button>
-          </div>
+          </div>` : ''}
         </div>` : `
       <div class="card">
         <div class="table-wrap">
           <table>
             <thead><tr><th>Tanggal</th><th>Buku / Bundle</th><th>Qty</th><th>Modal/pcs</th><th>Harga Final</th><th>Profit</th><th>Via</th><th>Catatan</th><th></th></tr></thead>
             <tbody>
-              ${[...S.sales].reverse().map(x => {
+              ${[...penjualanFiltered].reverse().map(x => {
                 if (x.isBundle) {
                   return `
                     <tr class="bundle-row">
@@ -819,6 +827,158 @@ export function render() {
           </table>
         </div>
       </div>` : ''}`;
+  }
+
+  // ── PREORDER ───────────────────────────────────────────────────────────────
+  if (S.currentTab === 'preorder') {
+    const fmtDate = d => { if (!d) return '—'; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
+    const pos = (S.preorders || []).map(po => ({ ...po, status: getPoStatus(po), total: getPoTotal(po) }));
+    const filterStatus = document.getElementById('po-filter-status')?.value || 'all';
+    const searchQ = (document.getElementById('po-search')?.value || '').toLowerCase();
+    const filtered = pos.filter(po => {
+      const matchStatus = filterStatus === 'all' || po.status === filterStatus;
+      const matchSearch = !searchQ || po.publisher.toLowerCase().includes(searchQ) ||
+        (po.items||[]).some(i => i.title.toLowerCase().includes(searchQ));
+      return matchStatus && matchSearch;
+    });
+    filtered.sort((a,b) => {
+      const order = { overdue:0, unpaid:1, partial:2, paid:3 };
+      if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+      return (a.dueDate||a.openDate||'').localeCompare(b.dueDate||b.openDate||'');
+    });
+    const totalOutstanding = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
+    const countOverdue = pos.filter(p=>p.status==='overdue').length;
+    const countUnpaid  = pos.filter(p=>p.status==='unpaid').length;
+    const cards = filtered.length === 0
+      ? `<div class="po-empty">Tidak ada preorder ditemukan</div>`
+      : filtered.map(po => {
+          const { label, cls } = getStatusLabel(po.status);
+          const remaining = po.total - (po.paidAmount||0);
+          const isOverdue = po.status==='overdue', isPaid = po.status==='paid';
+          const itemsList = (po.items||[]).map(item=>`
+            <div class="po-card-item">
+              <span class="po-card-item-title">${item.title}</span>
+              <span class="po-card-item-detail">${item.qty} pcs × ${fmt(item.pricePerPcs)}</span>
+            </div>`).join('');
+          const dates = [
+            po.openDate  ? `Open: ${fmtDate(po.openDate)}`   : null,
+            po.closeDate ? `Close: ${fmtDate(po.closeDate)}` : null,
+            po.readyDate ? `Ready: ${fmtDate(po.readyDate)}` : null,
+            po.dueDate   ? `Bayar: ${fmtDate(po.dueDate)}`   : null,
+          ].filter(Boolean).join(' · ');
+          return `
+            <div class="po-card ${isOverdue?'po-card-overdue':''}">
+              <div class="po-card-header">
+                <div>
+                  <span class="po-card-publisher">${po.publisher}</span>
+                  ${dates?`<span class="po-card-dates">${dates}</span>`:''}
+                </div>
+                <span class="inv-status ${cls}">${label}</span>
+              </div>
+              <div class="po-card-items">${itemsList}</div>
+              <div class="po-card-footer">
+                <div class="po-card-amounts">
+                  <span>Total: <strong>${fmt(po.total)}</strong></span>
+                  ${po.paidAmount?`<span>Dibayar: ${fmt(po.paidAmount)}</span>`:''}
+                  ${remaining>0?`<span class="po-remaining">Sisa: ${fmt(remaining)}</span>`:''}
+                </div>
+                <div class="po-card-actions">
+                  ${isPaid&&!po.bookArrived?`<button class="btn-xs btn-arrive" onclick="openBukuDatang('${po.id}')">📦 Buku Datang</button>`:''}
+                  ${po.bookArrived?`<span class="po-arrived-badge">✓ Stok masuk</span>`:''}
+                  ${!isPaid?`<button class="btn-xs btn-pay" onclick="openQuickPayPo('${po.id}')">Bayar</button>`:''}
+                  <button class="btn-xs btn-edit" onclick="openEditPreorder('${po.id}')">Edit</button>
+                  <button class="btn-xs btn-del"  onclick="deletePreorder('${po.id}')">Hapus</button>
+                </div>
+              </div>
+            </div>`;
+        }).join('');
+    area.innerHTML = `
+      <div class="page-hdr">
+        <div><div class="page-title">Preorder Buku</div><div class="page-sub">PO ke penerbit & tracking pembayaran</div></div>
+        <button class="btn-primary" onclick="openAddPreorder()">+ Buat PO</button>
+      </div>
+      <div class="inv-summary-row">
+        <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Outstanding</div><div class="inv-summary-value">${fmt(totalOutstanding)}</div></div>
+        <div class="inv-summary-card inv-summary-overdue"><div class="inv-summary-label">Terlambat Bayar</div><div class="inv-summary-value">${countOverdue} PO</div></div>
+        <div class="inv-summary-card inv-summary-unpaid"><div class="inv-summary-label">Belum Bayar</div><div class="inv-summary-value">${countUnpaid} PO</div></div>
+        <div class="inv-summary-card inv-summary-partial"><div class="inv-summary-label">Total PO</div><div class="inv-summary-value">${pos.length} PO</div></div>
+      </div>
+      <div class="inv-filters">
+        <input type="text" id="po-search" class="inv-search" placeholder="Cari penerbit atau judul buku..." oninput="render()" value="${searchQ}">
+        <select id="po-filter-status" class="inv-filter-select" onchange="render()">
+          <option value="all" ${filterStatus==='all'?'selected':''}>Semua Status</option>
+          <option value="overdue" ${filterStatus==='overdue'?'selected':''}>Terlambat</option>
+          <option value="unpaid"  ${filterStatus==='unpaid'?'selected':''}>Belum Bayar</option>
+          <option value="partial" ${filterStatus==='partial'?'selected':''}>Bayar Sebagian</option>
+          <option value="paid"    ${filterStatus==='paid'?'selected':''}>Lunas</option>
+        </select>
+      </div>
+      <div class="po-cards">${cards}</div>`;
+  }
+
+  // ── CASHFLOW ───────────────────────────────────────────────────────────────
+  if (S.currentTab === 'cashflow') {
+    const fmtDate = d => { if (!d) return '—'; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
+    const pos = (S.preorders||[]).map(po=>({ ...po, status: getPoStatus(po), total: getPoTotal(po) }));
+    const filterStatus = document.getElementById('cf-filter-status')?.value || 'all';
+    const searchQ = (document.getElementById('cf-search')?.value || '').toLowerCase();
+    const filtered = pos.filter(po => {
+      const matchStatus = filterStatus==='all' || po.status===filterStatus;
+      const matchSearch = !searchQ || po.publisher.toLowerCase().includes(searchQ);
+      return matchStatus && matchSearch;
+    });
+    filtered.sort((a,b) => {
+      const order={overdue:0,unpaid:1,partial:2,paid:3};
+      if (order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
+      return (a.dueDate||a.openDate||'').localeCompare(b.dueDate||b.openDate||'');
+    });
+    const totalHutang = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
+    const totalLunas  = pos.filter(p=>p.status==='paid').reduce((s,p)=>s+p.total,0);
+    const totalOverdue= pos.filter(p=>p.status==='overdue').length;
+    const rows = filtered.length===0
+      ? `<tr><td colspan="7" class="inv-empty">Tidak ada data cashflow</td></tr>`
+      : filtered.map(po => {
+          const {label,cls} = getStatusLabel(po.status);
+          const remaining = po.total-(po.paidAmount||0);
+          const isOverdue = po.status==='overdue';
+          const bookCount = (po.items||[]).reduce((s,i)=>s+i.qty,0);
+          return `<tr class="${isOverdue?'inv-row-overdue':''}">
+            <td>${fmtDate(po.openDate)}</td>
+            <td><span class="inv-supplier">${po.publisher}</span><span class="inv-number">${bookCount} buku · ${(po.items||[]).length} judul</span></td>
+            <td class="inv-due ${isOverdue?'inv-due-late':''}">${fmtDate(po.dueDate)}</td>
+            <td class="inv-amount">${fmt(po.total)}</td>
+            <td class="inv-amount">${po.paidAmount?fmt(po.paidAmount):'—'}</td>
+            <td class="inv-amount ${remaining>0?'inv-remaining':''}">${remaining>0?fmt(remaining):'—'}</td>
+            <td><span class="inv-status ${cls}">${label}</span></td>
+          </tr>`;
+        }).join('');
+    area.innerHTML = `
+      <div class="page-hdr">
+        <div><div class="page-title">Cashflow</div><div class="page-sub">Ringkasan hutang PO ke penerbit</div></div>
+      </div>
+      <div class="inv-summary-row">
+        <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Hutang</div><div class="inv-summary-value">${fmt(totalHutang)}</div></div>
+        <div class="inv-summary-card inv-summary-overdue"><div class="inv-summary-label">Terlambat</div><div class="inv-summary-value">${totalOverdue} PO</div></div>
+        <div class="inv-summary-card inv-summary-paid"><div class="inv-summary-label">Total Sudah Dibayar</div><div class="inv-summary-value">${fmt(totalLunas)}</div></div>
+        <div class="inv-summary-card inv-summary-partial"><div class="inv-summary-label">Total PO</div><div class="inv-summary-value">${pos.length} PO</div></div>
+      </div>
+      <div class="inv-filters">
+        <input type="text" id="cf-search" class="inv-search" placeholder="Cari penerbit..." oninput="render()" value="${searchQ}">
+        <select id="cf-filter-status" class="inv-filter-select" onchange="render()">
+          <option value="all"     ${filterStatus==='all'    ?'selected':''}>Semua Status</option>
+          <option value="overdue" ${filterStatus==='overdue'?'selected':''}>Terlambat</option>
+          <option value="unpaid"  ${filterStatus==='unpaid' ?'selected':''}>Belum Bayar</option>
+          <option value="partial" ${filterStatus==='partial'?'selected':''}>Bayar Sebagian</option>
+          <option value="paid"    ${filterStatus==='paid'   ?'selected':''}>Lunas</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="inv-table">
+          <thead><tr><th>Tgl PO</th><th>Penerbit</th><th>Deadline Bayar</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <p class="cf-note">* Data Cashflow otomatis dari tab Preorder. Untuk mencatat pembayaran, gunakan tombol Bayar di tab Preorder.</p>`;
   }
 
   // Reset scanner flag after each render
