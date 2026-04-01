@@ -15,6 +15,7 @@ import * as Sales from './sales.js';
 import * as Scanner from './scanner.js';
 import * as Import from './import.js';
 import * as Sync from './sync.js';
+import * as Preorder from './preorder.js';
 
 // ── Initialize modules with render callback ──────────────────────────────────
 Books.init(render);
@@ -22,6 +23,7 @@ Sales.init(render);
 Scanner.init(render);
 Import.init(render);
 Sync.init(render);
+Preorder.init(render);
 
 // ── goTab ────────────────────────────────────────────────────────────────────
 function goTab(tab, btn) {
@@ -29,7 +31,7 @@ function goTab(tab, btn) {
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   else {
-    const tabs = ['dashboard','stok','scanner','penjualan','restock','laporan'];
+    const tabs = ['dashboard','stok','scanner','penjualan','restock','laporan','preorder','cashflow'];
     document.querySelectorAll('.nav-tab')[tabs.indexOf(tab)]?.classList.add('active');
   }
   S.set.stokSearch(''); S.set.stokPub(''); S.set.stokCat('');
@@ -185,6 +187,22 @@ Object.assign(window, {
   testGsPost:         Sync.testGsPost,
   loadFromSheetsModal: Sync.loadFromSheetsModal,
   saveGsUrl:          Sync.saveGsUrl,
+
+  // Preorder
+  openAddPreorder:    Preorder.openAddPreorder,
+  savePreorder:       Preorder.savePreorder,
+  openEditPreorder:   Preorder.openEditPreorder,
+  updatePreorder:     Preorder.updatePreorder,
+  deletePreorder:     Preorder.deletePreorder,
+  openQuickPayPo:     Preorder.openQuickPayPo,
+  saveQuickPayPo:     Preorder.saveQuickPayPo,
+  openBukuDatang:     Preorder.openBukuDatang,
+  confirmBukuDatang:  Preorder.confirmBukuDatang,
+  bdBarcodeKeydown:   Preorder.bdBarcodeKeydown,
+  saveNewBookFromPo:  Preorder.saveNewBookFromPo,
+  poAddItem:          Preorder.poAddItem,
+  poRemoveItem:       Preorder.poRemoveItem,
+  poUpdateTotal:      Preorder.poUpdateTotal,
 
   // Helpers
   closeModal,

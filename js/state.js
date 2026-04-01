@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Core data ────────────────────────────────────────────────────────────────
-export let books = [], sales = [], restocks = [];
+export let books = [], sales = [], restocks = [], preorders = [];
 function localDate() {
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -24,7 +24,7 @@ export let bundleItems = [], bundlePrice = 0, bundleNote = '';
 
 // ── Setters (needed because only declaring module can reassign) ──────────────
 export const set = {
-  books(v){ books=v; }, sales(v){ sales=v; }, restocks(v){ restocks=v; }, period(v){ period=v; },
+  books(v){ books=v; }, sales(v){ sales=v; }, restocks(v){ restocks=v; }, preorders(v){ preorders=v; }, period(v){ period=v; },
   currentTab(v){ currentTab=v; }, stokSearch(v){ stokSearch=v; }, stokPub(v){ stokPub=v; },
   stokCat(v){ stokCat=v; }, searchDebounceTimer(v){ searchDebounceTimer=v; },
   scannerJustFired(v){ scannerJustFired=v; }, scanMode(v){ scanMode=v; },
@@ -42,11 +42,30 @@ export const set = {
 // ═══════════════════════════════════════════════════════════════════════════
 const LS = 'perpbrian_v1';
 
+function sanitizePreorder(po) {
+  return {
+    id:          String(po.id || ''),
+    publisher:   String(po.publisher || ''),
+    openDate:    po.openDate  || null,
+    closeDate:   po.closeDate || null,
+    readyDate:   po.readyDate || null,
+    dueDate:     po.dueDate   || null,
+    paidAmount:  Number(po.paidAmount) || 0,
+    bookArrived: Boolean(po.bookArrived),
+    items: (po.items || []).map(i => ({
+      id:          String(i.id || ''),
+      title:       String(i.title || ''),
+      qty:         Number(i.qty) || 0,
+      pricePerPcs: Number(i.pricePerPcs) || 0,
+    })),
+  };
+}
+
 export function load() {
   try {
     const d = JSON.parse(localStorage.getItem(LS));
     if (d && Array.isArray(d.books)) {
-      books = d.books; sales = d.sales||[]; restocks = d.restocks||[]; period = d.period||period;
+      books = d.books; sales = d.sales||[]; restocks = d.restocks||[]; preorders = (d.preorders||[]).map(sanitizePreorder); period = d.period||period;
       return true;
     }
   } catch(e) {}
@@ -54,7 +73,7 @@ export function load() {
 }
 
 export function save() {
-  try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, period })); }
+  try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, period })); }
   catch(e) { console.warn('localStorage save failed'); }
   scheduleSync();
 }
@@ -93,13 +112,13 @@ export async function syncToSheets(showFeedback=false) {
   updateSyncUI('syncing');
   try {
     const res = await fetch(gsUrl, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks } }), redirect:'follow' });
+      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders } }), redirect:'follow' });
     const json = JSON.parse(await res.text());
     if (json.ok) { updateSyncUI('connected'); if(showFeedback) console.log('Sync OK'); return; }
     throw new Error(json.error);
   } catch(err) {
     try {
-      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks }));
+      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders }));
       const json2 = await (await fetch(`${gsUrl}?action=sync&payload=${enc}`, {redirect:'follow'})).json();
       if (json2.ok) { updateSyncUI('connected'); return; }
     } catch(e2) {}
@@ -137,6 +156,7 @@ export async function loadFromSheets() {
       restocks = (json.data.restocks||[]).map(r => ({
         ...r, id: num(r.id)||r.id, bookId: num(r.bookId)||r.bookId, qty: num(r.qty), buyPrice: num(r.buyPrice), date: fixDate(r.date),
       }));
+      preorders = (json.data.preorders||[]).map(sanitizePreorder);
       save(); updateSyncUI('connected'); return true;
     }
   } catch(e) {}
@@ -215,11 +235,15 @@ export async function fetchFromSheetsOnBoot() {
         buyPrice: num(r.buyPrice),
         date: fixDate(r.date),
       }));
+
+      // Sanitize preorders
+      const sheetPreorders = (json.data.preorders||[]).map(sanitizePreorder);
+
       // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
       if (sheetBooks.length > 0 || sheetSales.length > 0) {
-        books = sheetBooks; sales = sheetSales; restocks = sheetRestocks;
+        books = sheetBooks; sales = sheetSales; restocks = sheetRestocks; preorders = sheetPreorders;
         // Save to localStorage (but scheduleSync is blocked, so won't push back to Sheets)
-        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, period })); }
+        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, period })); }
         catch(e) {}
       }
       bootFetching = false;
