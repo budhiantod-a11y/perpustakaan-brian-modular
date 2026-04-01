@@ -3,7 +3,6 @@
 
 import * as S from './state.js';
 import { uid, today, fmt, showToast, openModal, closeModal } from './helpers.js';
-import { saveBook } from './books.js';
 
 let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
@@ -11,7 +10,7 @@ export function init(renderFn) { _render = renderFn; }
 // ─── Status helpers ────────────────────────────────────────────────────────────
 
 export function getPoStatus(po) {
-  const paid = Number(po.paidAmount) || 0;
+  const paid  = Number(po.paidAmount) || 0;
   const total = getPoTotal(po);
   if (paid >= total && total > 0) return 'paid';
   if (po.dueDate && po.dueDate < today() && paid < total) return 'overdue';
@@ -32,65 +31,64 @@ export function getStatusLabel(status) {
   }[status] || { label: status, cls: '' };
 }
 
+// Days until due date (negative = overdue)
+export function daysUntilDue(dueDate) {
+  if (!dueDate) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const due = new Date(dueDate); due.setHours(0,0,0,0);
+  return Math.round((due - now) / 86400000);
+}
+
+// ─── Shared field helper ───────────────────────────────────────────────────────
+
+function field(label, inputHtml) {
+  return `<div class="field"><label>${label}</label>${inputHtml}</div>`;
+}
+
+function inp(attrs) {
+  return `<input class="inp" ${attrs}>`;
+}
+
 // ─── Add PO ───────────────────────────────────────────────────────────────────
 
 export function openAddPreorder() {
+  _poItemCount = 1;
   openModal(`
     <h2 class="modal-title">Buat Preorder Baru</h2>
-    <div class="form-group">
-      <label>Nama Penerbit *</label>
-      <input type="text" id="po-publisher" placeholder="Contoh: Gramedia Pustaka Utama" autocomplete="off">
+    ${field('Nama Penerbit *', inp('type="text" id="po-publisher" placeholder="Contoh: Gramedia Pustaka Utama" autocomplete="off"'))}
+    <div class="inp-grid-2">
+      ${field('Tgl Open PO',  inp('type="date" id="po-open-date" value="' + today() + '"'))}
+      ${field('Tgl Close PO', inp('type="date" id="po-close-date"'))}
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Tgl Open PO</label>
-        <input type="date" id="po-open-date" value="${today()}">
-      </div>
-      <div class="form-group">
-        <label>Tgl Close PO</label>
-        <input type="date" id="po-close-date">
-      </div>
+    <div class="inp-grid-2">
+      ${field('Tgl Ready Penerbit',  inp('type="date" id="po-ready-date"'))}
+      ${field('Deadline Pembayaran', inp('type="date" id="po-due-date"'))}
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Tgl Ready Penerbit</label>
-        <input type="date" id="po-ready-date">
+    <div class="field">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label style="margin:0">Daftar Buku *</label>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="poAddItem()">+ Tambah Buku</button>
       </div>
-      <div class="form-group">
-        <label>Deadline Pembayaran</label>
-        <input type="date" id="po-due-date">
+      <div id="po-items-list">${poItemRow(0)}</div>
+      <div class="preview-box" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total PO</span>
+        <span style="font-size:16px;font-weight:700;color:var(--text)" id="po-total-display">Rp 0</span>
       </div>
     </div>
-
-    <div class="po-items-section">
-      <div class="po-items-header">
-        <label>Daftar Buku *</label>
-        <button type="button" class="btn-xs btn-add-item" onclick="poAddItem()">+ Tambah Buku</button>
-      </div>
-      <div id="po-items-list">
-        ${poItemRow(0)}
-      </div>
-      <div class="po-total-preview">
-        Total: <strong id="po-total-display">Rp 0</strong>
-      </div>
-    </div>
-
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn-primary" onclick="savePreorder()">Simpan PO</button>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="savePreorder()">Simpan PO</button>
     </div>
   `);
 }
 
 export function poItemRow(idx) {
-  return `
-    <div class="po-item-row" id="po-item-${idx}" data-idx="${idx}">
-      <input type="text" class="po-item-title" placeholder="Judul buku" oninput="poUpdateTotal()">
-      <input type="number" class="po-item-qty" placeholder="Qty" min="1" value="1" oninput="poUpdateTotal()">
-      <input type="number" class="po-item-price" placeholder="Harga/pcs" min="0" oninput="poUpdateTotal()">
-      <button type="button" class="btn-xs btn-del" onclick="poRemoveItem(${idx})">✕</button>
-    </div>
-  `;
+  return '<div class="po-item-row" id="po-item-' + idx + '" style="display:grid;grid-template-columns:1fr 72px 130px 32px;gap:8px;margin-bottom:8px;align-items:center">'
+    + '<input class="inp" style="padding:8px 10px;font-size:13px" type="text" placeholder="Judul buku" oninput="poUpdateTotal()">'
+    + '<input class="inp" style="padding:8px 10px;font-size:13px;text-align:center" type="number" min="1" value="1" oninput="poUpdateTotal()">'
+    + '<input class="inp" style="padding:8px 10px;font-size:13px" type="number" min="0" placeholder="Harga/pcs" oninput="poUpdateTotal()">'
+    + '<button type="button" class="btn btn-danger btn-xs" style="padding:6px 8px;font-size:13px;height:36px" onclick="poRemoveItem(' + idx + ')">✕</button>'
+    + '</div>';
 }
 
 let _poItemCount = 1;
@@ -104,33 +102,29 @@ export function poAddItem() {
 }
 
 export function poRemoveItem(idx) {
-  const el = document.getElementById(`po-item-${idx}`);
+  const el = document.getElementById('po-item-' + idx);
   if (el) el.remove();
   poUpdateTotal();
 }
 
 export function poUpdateTotal() {
-  const rows = document.querySelectorAll('.po-item-row');
   let total = 0;
-  rows.forEach(row => {
-    const qty   = Number(row.querySelector('.po-item-qty')?.value) || 0;
-    const price = Number(row.querySelector('.po-item-price')?.value) || 0;
-    total += qty * price;
+  document.querySelectorAll('.po-item-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    total += (Number(inputs[1]?.value) || 0) * (Number(inputs[2]?.value) || 0);
   });
   const el = document.getElementById('po-total-display');
   if (el) el.textContent = fmt(total);
 }
 
 function collectItems() {
-  const rows = document.querySelectorAll('.po-item-row');
   const items = [];
-  rows.forEach(row => {
-    const title      = row.querySelector('.po-item-title')?.value.trim();
-    const qty        = Number(row.querySelector('.po-item-qty')?.value) || 0;
-    const pricePerPcs= Number(row.querySelector('.po-item-price')?.value) || 0;
-    if (title && qty > 0 && pricePerPcs > 0) {
-      items.push({ id: uid(), title, qty, pricePerPcs });
-    }
+  document.querySelectorAll('.po-item-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const title  = inputs[0]?.value.trim();
+    const qty    = Number(inputs[1]?.value) || 0;
+    const price  = Number(inputs[2]?.value) || 0;
+    if (title && qty > 0 && price > 0) items.push({ id: uid(), title, qty, pricePerPcs: price });
   });
   return items;
 }
@@ -138,32 +132,15 @@ function collectItems() {
 export function savePreorder() {
   _poItemCount = 1;
   const publisher = document.getElementById('po-publisher')?.value.trim();
-  const openDate  = document.getElementById('po-open-date')?.value || null;
+  const openDate  = document.getElementById('po-open-date')?.value  || null;
   const closeDate = document.getElementById('po-close-date')?.value || null;
   const readyDate = document.getElementById('po-ready-date')?.value || null;
-  const dueDate   = document.getElementById('po-due-date')?.value || null;
+  const dueDate   = document.getElementById('po-due-date')?.value   || null;
   const items     = collectItems();
-
   if (!publisher) return showToast('Nama penerbit wajib diisi', 'error');
-  if (items.length === 0) return showToast('Tambahkan minimal 1 buku dengan judul, qty, dan harga', 'error');
-
-  const po = {
-    id: uid(),
-    publisher,
-    openDate,
-    closeDate,
-    readyDate,
-    dueDate,
-    items,
-    paidAmount: 0,
-    bookArrived: false,
-  };
-
-  S.preorders.push(po);
-  S.save();
-  closeModal();
-  showToast('Preorder berhasil dibuat', 'success');
-  _render();
+  if (!items.length) return showToast('Tambahkan minimal 1 buku dengan judul, qty, dan harga', 'error');
+  S.preorders.push({ id: uid(), publisher, openDate, closeDate, readyDate, dueDate, items, paidAmount: 0, bookArrived: false });
+  S.save(); closeModal(); showToast('Preorder berhasil dibuat ✓'); _render();
 }
 
 // ─── Edit PO ──────────────────────────────────────────────────────────────────
@@ -172,59 +149,39 @@ export function openEditPreorder(id) {
   const po = S.preorders.find(p => p.id === id);
   if (!po) return;
   _poItemCount = po.items.length;
-
-  const itemsHtml = po.items.map((item, idx) => `
-    <div class="po-item-row" id="po-item-${idx}" data-idx="${idx}">
-      <input type="text" class="po-item-title" placeholder="Judul buku" value="${item.title || ''}" oninput="poUpdateTotal()">
-      <input type="number" class="po-item-qty" placeholder="Qty" min="1" value="${item.qty}" oninput="poUpdateTotal()">
-      <input type="number" class="po-item-price" placeholder="Harga/pcs" min="0" value="${item.pricePerPcs}" oninput="poUpdateTotal()">
-      <button type="button" class="btn-xs btn-del" onclick="poRemoveItem(${idx})">✕</button>
-    </div>
-  `).join('');
-
-  const total = getPoTotal(po);
-
+  const itemsHtml = po.items.map((item, idx) =>
+    '<div class="po-item-row" id="po-item-' + idx + '" style="display:grid;grid-template-columns:1fr 72px 130px 32px;gap:8px;margin-bottom:8px;align-items:center">'
+    + '<input class="inp" style="padding:8px 10px;font-size:13px" type="text" value="' + (item.title||'') + '" oninput="poUpdateTotal()">'
+    + '<input class="inp" style="padding:8px 10px;font-size:13px;text-align:center" type="number" min="1" value="' + item.qty + '" oninput="poUpdateTotal()">'
+    + '<input class="inp" style="padding:8px 10px;font-size:13px" type="number" min="0" value="' + item.pricePerPcs + '" oninput="poUpdateTotal()">'
+    + '<button type="button" class="btn btn-danger btn-xs" style="padding:6px 8px;font-size:13px;height:36px" onclick="poRemoveItem(' + idx + ')">✕</button>'
+    + '</div>'
+  ).join('');
   openModal(`
     <h2 class="modal-title">Edit Preorder</h2>
-    <div class="form-group">
-      <label>Nama Penerbit *</label>
-      <input type="text" id="po-publisher" value="${po.publisher || ''}" autocomplete="off">
+    ${field('Nama Penerbit *', inp('type="text" id="po-publisher" value="' + (po.publisher||'') + '" autocomplete="off"'))}
+    <div class="inp-grid-2">
+      ${field('Tgl Open PO',  inp('type="date" id="po-open-date"  value="' + (po.openDate||'')  + '"'))}
+      ${field('Tgl Close PO', inp('type="date" id="po-close-date" value="' + (po.closeDate||'') + '"'))}
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Tgl Open PO</label>
-        <input type="date" id="po-open-date" value="${po.openDate || ''}">
-      </div>
-      <div class="form-group">
-        <label>Tgl Close PO</label>
-        <input type="date" id="po-close-date" value="${po.closeDate || ''}">
-      </div>
+    <div class="inp-grid-2">
+      ${field('Tgl Ready Penerbit',  inp('type="date" id="po-ready-date" value="' + (po.readyDate||'') + '"'))}
+      ${field('Deadline Pembayaran', inp('type="date" id="po-due-date"   value="' + (po.dueDate||'')   + '"'))}
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Tgl Ready Penerbit</label>
-        <input type="date" id="po-ready-date" value="${po.readyDate || ''}">
-      </div>
-      <div class="form-group">
-        <label>Deadline Pembayaran</label>
-        <input type="date" id="po-due-date" value="${po.dueDate || ''}">
-      </div>
-    </div>
-
-    <div class="po-items-section">
-      <div class="po-items-header">
-        <label>Daftar Buku *</label>
-        <button type="button" class="btn-xs btn-add-item" onclick="poAddItem()">+ Tambah Buku</button>
+    <div class="field">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <label style="margin:0">Daftar Buku *</label>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="poAddItem()">+ Tambah Buku</button>
       </div>
       <div id="po-items-list">${itemsHtml}</div>
-      <div class="po-total-preview">
-        Total: <strong id="po-total-display">${fmt(total)}</strong>
+      <div class="preview-box" style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total PO</span>
+        <span style="font-size:16px;font-weight:700;color:var(--text)" id="po-total-display">${fmt(getPoTotal(po))}</span>
       </div>
     </div>
-
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn-primary" onclick="updatePreorder('${id}')">Simpan</button>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick="updatePreorder('${id}')">Simpan</button>
     </div>
   `);
 }
@@ -233,22 +190,16 @@ export function updatePreorder(id) {
   _poItemCount = 1;
   const idx = S.preorders.findIndex(p => p.id === id);
   if (idx === -1) return;
-
   const publisher = document.getElementById('po-publisher')?.value.trim();
-  const openDate  = document.getElementById('po-open-date')?.value || null;
+  const openDate  = document.getElementById('po-open-date')?.value  || null;
   const closeDate = document.getElementById('po-close-date')?.value || null;
   const readyDate = document.getElementById('po-ready-date')?.value || null;
-  const dueDate   = document.getElementById('po-due-date')?.value || null;
+  const dueDate   = document.getElementById('po-due-date')?.value   || null;
   const items     = collectItems();
-
   if (!publisher) return showToast('Nama penerbit wajib diisi', 'error');
-  if (items.length === 0) return showToast('Tambahkan minimal 1 buku', 'error');
-
+  if (!items.length) return showToast('Tambahkan minimal 1 buku', 'error');
   S.preorders[idx] = { ...S.preorders[idx], publisher, openDate, closeDate, readyDate, dueDate, items };
-  S.save();
-  closeModal();
-  showToast('Preorder diperbarui', 'success');
-  _render();
+  S.save(); closeModal(); showToast('Preorder diperbarui ✓'); _render();
 }
 
 // ─── Delete PO ────────────────────────────────────────────────────────────────
@@ -256,11 +207,9 @@ export function updatePreorder(id) {
 export function deletePreorder(id) {
   const po = S.preorders.find(p => p.id === id);
   if (!po) return;
-  if (!confirm(`Hapus preorder dari "${po.publisher}"? Aksi ini tidak bisa dibatalkan.`)) return;
+  if (!confirm('Hapus preorder dari "' + po.publisher + '"? Aksi ini tidak bisa dibatalkan.')) return;
   S.set.preorders(S.preorders.filter(p => p.id !== id));
-  S.save();
-  showToast('Preorder dihapus', 'success');
-  _render();
+  S.save(); showToast('Preorder dihapus'); _render();
 }
 
 // ─── Quick Pay ────────────────────────────────────────────────────────────────
@@ -272,17 +221,19 @@ export function openQuickPayPo(id) {
   const remaining = total - (po.paidAmount || 0);
   openModal(`
     <h2 class="modal-title">Catat Pembayaran</h2>
-    <p style="margin-bottom:12px;color:var(--text-secondary)">
-      <strong>${po.publisher}</strong><br>
-      Sisa tagihan: <strong>${fmt(remaining)}</strong>
-    </p>
-    <div class="form-group">
-      <label>Jumlah Dibayar Sekarang (Rp)</label>
-      <input type="number" id="qpay-amount" min="0" max="${remaining}" value="${remaining}">
+    <div class="preview-box" style="margin-bottom:20px">
+      <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:10px">${po.publisher}</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total PO</div><div style="font-weight:700;margin-top:3px">${fmt(total)}</div></div>
+        <div><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Sudah Bayar</div><div style="font-weight:700;margin-top:3px">${fmt(po.paidAmount || 0)}</div></div>
+        <div><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Sisa</div><div style="font-weight:700;color:var(--red);margin-top:3px">${fmt(remaining)}</div></div>
+      </div>
     </div>
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn-primary" onclick="saveQuickPayPo('${id}')">Bayar</button>
+    ${field('Jumlah Dibayar Sekarang (Rp) *', inp('type="number" id="qpay-amount" min="0" max="' + remaining + '" value="' + remaining + '" placeholder="0"'))}
+    ${field('Tanggal Pembayaran', inp('type="date" id="qpay-date" value="' + today() + '"'))}
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-green" onclick="saveQuickPayPo('${id}')">💳 Catat Pembayaran</button>
     </div>
   `);
 }
@@ -290,17 +241,14 @@ export function openQuickPayPo(id) {
 export function saveQuickPayPo(id) {
   const idx = S.preorders.findIndex(p => p.id === id);
   if (idx === -1) return;
-  const po      = S.preorders[idx];
-  const total   = getPoTotal(po);
-  const nowPay  = Number(document.getElementById('qpay-amount')?.value) || 0;
+  const po     = S.preorders[idx];
+  const total  = getPoTotal(po);
+  const nowPay = Number(document.getElementById('qpay-amount')?.value) || 0;
   if (nowPay <= 0) return showToast('Jumlah harus lebih dari 0', 'error');
-
   const newPaid = Math.min((po.paidAmount || 0) + nowPay, total);
   S.preorders[idx] = { ...po, paidAmount: newPaid };
-  S.save();
-  closeModal();
-  const status = getPoStatus(S.preorders[idx]);
-  showToast(status === 'paid' ? 'PO lunas! ✓' : 'Pembayaran dicatat', 'success');
+  S.save(); closeModal();
+  showToast(getPoStatus(S.preorders[idx]) === 'paid' ? 'PO lunas! ✓' : 'Pembayaran dicatat ✓');
   _render();
 }
 
@@ -309,156 +257,83 @@ export function saveQuickPayPo(id) {
 export function openBukuDatang(id) {
   const po = S.preorders.find(p => p.id === id);
   if (!po) return;
-
-  const itemsHtml = po.items.map((item, idx) => `
-    <div class="buku-datang-row" id="bd-row-${idx}">
-      <div class="bd-book-info">
-        <span class="bd-title">${item.title}</span>
-        <span class="bd-qty">${item.qty} pcs · ${fmt(item.pricePerPcs)}/pcs</span>
-      </div>
-      <div class="bd-barcode-wrap">
-        <input
-          type="text"
-          class="bd-barcode-input"
-          id="bd-barcode-${idx}"
-          placeholder="Scan / ketik barcode"
-          data-item-idx="${idx}"
-          onkeydown="bdBarcodeKeydown(event, ${idx}, '${id}')"
-        >
-        <span class="bd-barcode-status" id="bd-status-${idx}"></span>
-      </div>
-    </div>
-  `).join('');
-
-  openModal(`
-    <h2 class="modal-title">Buku Datang — Input Barcode</h2>
-    <p class="modal-subtitle">Scan atau ketik barcode tiap buku. Enter untuk konfirmasi.</p>
-    <div class="buku-datang-list">
-      ${itemsHtml}
-    </div>
-    <div class="modal-actions" style="margin-top:20px">
-      <button class="btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn-primary" onclick="confirmBukuDatang('${id}')">Konfirmasi Semua & Restock</button>
-    </div>
-  `);
-
-  // Auto-focus first barcode input
+  const itemsHtml = po.items.map((item, idx) =>
+    '<div class="buku-datang-row" id="bd-row-' + idx + '">'
+    + '<div class="bd-book-info"><span class="bd-title">' + item.title + '</span>'
+    + '<span class="bd-qty">' + item.qty + ' pcs · ' + fmt(item.pricePerPcs) + '/pcs</span></div>'
+    + '<div class="bd-barcode-wrap">'
+    + '<input class="inp bd-barcode-input" type="text" id="bd-barcode-' + idx + '" placeholder="Scan / ketik barcode → Enter" onkeydown="bdBarcodeKeydown(event,' + idx + ',\'' + id + '\')">'
+    + '<span class="bd-barcode-status" id="bd-status-' + idx + '"></span>'
+    + '</div></div>'
+  ).join('');
+  openModal(
+    '<h2 class="modal-title">📦 Buku Datang — Input Barcode</h2>'
+    + '<p style="font-size:13px;color:var(--text3);margin-bottom:16px">Scan atau ketik barcode tiap buku → tekan <kbd style="background:var(--bg);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:11px">Enter</kbd> untuk konfirmasi per buku.</p>'
+    + '<div class="buku-datang-list">' + itemsHtml + '</div>'
+    + '<div class="modal-footer">'
+    + '<button class="btn btn-ghost" onclick="closeModal()">Batal</button>'
+    + '<button class="btn btn-green" onclick="confirmBukuDatang(\'' + id + '\')">✓ Konfirmasi & Restock Semua</button>'
+    + '</div>'
+  );
   setTimeout(() => document.getElementById('bd-barcode-0')?.focus(), 100);
 }
 
-// On Enter per barcode input: lookup book and show preview
 export function bdBarcodeKeydown(e, idx, poId) {
   if (e.key !== 'Enter') return;
-  const input   = document.getElementById(`bd-barcode-${idx}`);
-  const statusEl= document.getElementById(`bd-status-${idx}`);
+  const input = document.getElementById('bd-barcode-' + idx);
+  const statusEl = document.getElementById('bd-status-' + idx);
   if (!input || !statusEl) return;
   const barcode = input.value.trim();
   if (!barcode) return;
-
   const book = S.books.find(b => b.barcode === barcode);
-  if (book) {
-    statusEl.textContent = `✓ ${book.title}`;
-    statusEl.className = 'bd-barcode-status bd-found';
-  } else {
-    statusEl.textContent = '⚠ Buku baru — akan dibuat saat konfirmasi';
-    statusEl.className = 'bd-barcode-status bd-new';
-  }
-
-  // Move focus to next input
-  const nextInput = document.getElementById(`bd-barcode-${idx + 1}`);
-  if (nextInput) nextInput.focus();
+  statusEl.innerHTML = book
+    ? '<span class="badge badge-green">✓ ' + book.title + '</span>'
+    : '<span class="badge badge-amber">⚠ Buku baru</span>';
+  document.getElementById('bd-barcode-' + (idx + 1))?.focus();
 }
 
 export function confirmBukuDatang(poId) {
   const poIdx = S.preorders.findIndex(p => p.id === poId);
   if (poIdx === -1) return;
   const po = S.preorders[poIdx];
-
-  const rows = document.querySelectorAll('.buku-datang-row');
-  let allFilled = true;
-  let newBooksNeeded = []; // items that need a new book form
-
-  rows.forEach((row, idx) => {
-    const barcode = document.getElementById(`bd-barcode-${idx}`)?.value.trim();
-    if (!barcode) { allFilled = false; return; }
-    const item  = po.items[idx];
-    const book  = S.books.find(b => b.barcode === barcode);
-    if (!book) {
-      newBooksNeeded.push({ idx, barcode, item });
-    }
-  });
-
-  if (!allFilled) return showToast('Semua buku harus diisi barcodenya', 'error');
-
-  if (newBooksNeeded.length > 0) {
-    // Show new book form for first unregistered book
-    openNewBookFromPo(poId, newBooksNeeded, 0, collectBarcodes(po.items.length));
-    return;
-  }
-
-  // All books exist → restock all
-  processRestockAll(poId, collectBarcodes(po.items.length));
-}
-
-function collectBarcodes(count) {
-  const barcodes = [];
-  for (let i = 0; i < count; i++) {
-    barcodes.push(document.getElementById(`bd-barcode-${i}`)?.value.trim() || '');
-  }
-  return barcodes;
+  const barcodes = po.items.map((_, idx) => document.getElementById('bd-barcode-' + idx)?.value.trim() || '');
+  if (barcodes.some(b => !b)) return showToast('Semua buku harus diisi barcodenya', 'error');
+  const newBooks = po.items.map((item, idx) => ({ idx, barcode: barcodes[idx], item }))
+    .filter(({ barcode }) => !S.books.find(b => b.barcode === barcode));
+  if (newBooks.length > 0) { openNewBookFromPo(poId, newBooks, 0, barcodes); return; }
+  processRestockAll(poId, barcodes);
 }
 
 // ─── New Book Form (from PO context) ──────────────────────────────────────────
 
 function openNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
-  if (currentIdx >= newBooksNeeded.length) {
-    // All new books handled → restock all
-    processRestockAll(poId, barcodes);
-    return;
-  }
-
-  const { idx, barcode, item } = newBooksNeeded[currentIdx];
+  if (currentIdx >= newBooksNeeded.length) { processRestockAll(poId, barcodes); return; }
+  const { barcode, item } = newBooksNeeded[currentIdx];
   const remaining = newBooksNeeded.length - currentIdx;
-
-  openModal(`
-    <h2 class="modal-title">Buku Baru — Lengkapi Data</h2>
-    <p class="modal-subtitle" style="color:var(--text-secondary);margin-bottom:16px">
-      Barcode <strong>${barcode}</strong> belum ada di sistem. Lengkapi data buku ini.
-      ${remaining > 1 ? `<br><em>(${remaining - 1} buku baru lagi setelah ini)</em>` : ''}
-    </p>
-    <div class="form-group">
-      <label>Barcode</label>
-      <input type="text" id="nb-barcode" value="${barcode}" readonly style="opacity:.6">
-    </div>
-    <div class="form-group">
-      <label>Judul *</label>
-      <input type="text" id="nb-title" value="${item.title || ''}" autocomplete="off">
-    </div>
-    <div class="form-group">
-      <label>Penulis</label>
-      <input type="text" id="nb-author" placeholder="Opsional">
-    </div>
-    <div class="form-group">
-      <label>Penerbit</label>
-      <input type="text" id="nb-publisher" value="${S.preorders.find(p=>p.id===poId)?.publisher || ''}" autocomplete="off">
-    </div>
-    <div class="form-group">
-      <label>Kategori</label>
-      <input type="text" id="nb-category" placeholder="Opsional">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Harga Jual Normal (Rp)</label>
-        <input type="number" id="nb-normal-price" min="0" placeholder="0">
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Batal</button>
-      <button class="btn-primary" onclick="saveNewBookFromPo('${poId}', ${JSON.stringify(newBooksNeeded).replace(/"/g, '&quot;')}, ${currentIdx}, ${JSON.stringify(barcodes).replace(/"/g, '&quot;')})">
-        Simpan & Lanjut
-      </button>
-    </div>
-  `);
+  const po = S.preorders.find(p => p.id === poId);
+  openModal(
+    '<h2 class="modal-title">Buku Baru — Lengkapi Data</h2>'
+    + '<div class="preview-box" style="margin-bottom:16px">'
+    + '<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Barcode</div>'
+    + '<div style="font-family:monospace;font-size:15px;font-weight:700">' + barcode + '</div>'
+    + (remaining > 1 ? '<div style="margin-top:6px;font-size:12px;color:var(--text3)">' + (remaining-1) + ' buku baru lagi setelah ini</div>' : '')
+    + '</div>'
+    + '<input type="hidden" id="nb-barcode" value="' + barcode + '">'
+    + field('Judul *', inp('type="text" id="nb-title" value="' + (item.title||'') + '" autocomplete="off"'))
+    + '<div class="inp-grid-2">'
+    + field('Penulis', inp('type="text" id="nb-author" placeholder="Opsional"'))
+    + field('Penerbit', inp('type="text" id="nb-publisher" value="' + (po?.publisher||'') + '" autocomplete="off"'))
+    + '</div>'
+    + '<div class="inp-grid-2">'
+    + field('Kategori', inp('type="text" id="nb-category" placeholder="Opsional"'))
+    + field('Harga Jual Normal (Rp)', inp('type="number" id="nb-normal-price" min="0" placeholder="0"'))
+    + '</div>'
+    + '<div class="modal-footer">'
+    + '<button class="btn btn-ghost" onclick="closeModal()">Batal</button>'
+    + '<button class="btn btn-primary" onclick="saveNewBookFromPo(\'' + poId + '\',' + JSON.stringify(newBooksNeeded).replace(/"/g,'&quot;') + ',' + currentIdx + ',' + JSON.stringify(barcodes).replace(/"/g,'&quot;') + ')">'
+    + 'Simpan & Lanjut' + (remaining > 1 ? ' (' + (currentIdx+1) + '/' + newBooksNeeded.length + ')' : '') + '</button>'
+    + '</div>'
+  );
 }
 
 export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
@@ -468,33 +343,13 @@ export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
   const publisher   = document.getElementById('nb-publisher')?.value.trim();
   const category    = document.getElementById('nb-category')?.value.trim();
   const normalPrice = Number(document.getElementById('nb-normal-price')?.value) || 0;
-
   if (!title) return showToast('Judul buku wajib diisi', 'error');
-
-  const po   = S.preorders.find(p => p.id === poId);
+  const po = S.preorders.find(p => p.id === poId);
   const item = newBooksNeeded[currentIdx].item;
-
-  // Create new book (empty batches — restock will add batch below)
-  const newBook = {
-    id: uid(),
-    barcode,
-    title,
-    author,
-    publisher,
-    category,
-    normalPrice,
-    sellPrice: normalPrice,
-    batches: [],
-  };
+  const newBook = { id: uid(), barcode, title, author, publisher, category, normalPrice, sellPrice: normalPrice, batches: [] };
   S.books.push(newBook);
-
-  // Add restock batch for this book
   addRestockBatch(newBook.id, title, item.qty, item.pricePerPcs, po?.openDate || today());
-
-  S.save();
-  showToast(`Buku "${title}" ditambahkan`, 'success');
-
-  // Continue to next new book
+  S.save(); showToast('"' + title + '" ditambahkan ✓');
   openNewBookFromPo(poId, newBooksNeeded, currentIdx + 1, barcodes);
 }
 
@@ -504,42 +359,17 @@ function processRestockAll(poId, barcodes) {
   const poIdx = S.preorders.findIndex(p => p.id === poId);
   if (poIdx === -1) return;
   const po = S.preorders[poIdx];
-
   po.items.forEach((item, idx) => {
-    const barcode = barcodes[idx];
-    const book    = S.books.find(b => b.barcode === barcode);
-    if (book) {
-      addRestockBatch(book.id, book.title, item.qty, item.pricePerPcs, po.openDate || today());
-    }
-    // New books were already handled in saveNewBookFromPo
+    const book = S.books.find(b => b.barcode === barcodes[idx]);
+    if (book) addRestockBatch(book.id, book.title, item.qty, item.pricePerPcs, po.openDate || today());
   });
-
-  // Mark PO as bookArrived
   S.preorders[poIdx] = { ...po, bookArrived: true };
-  S.save();
-  closeModal();
-  showToast('Semua buku berhasil di-restock! ✓', 'success');
-  _render();
+  S.save(); closeModal(); showToast('Semua buku berhasil di-restock! ✓'); _render();
 }
 
 function addRestockBatch(bookId, bookTitle, qty, buyPrice, date) {
-  const bookIdx = S.books.findIndex(b => b.id === bookId);
-  if (bookIdx === -1) return;
-  S.books[bookIdx].batches.push({
-    id: uid(),
-    qty: Number(qty),
-    remaining: Number(qty),
-    buyPrice: Number(buyPrice),
-    date,
-  });
-  // Also record in restocks log
-  S.restocks.push({
-    id: uid(),
-    bookId,
-    bookTitle,
-    qty: Number(qty),
-    buyPrice: Number(buyPrice),
-    date,
-    note: 'Dari Preorder',
-  });
+  const idx = S.books.findIndex(b => b.id === bookId);
+  if (idx === -1) return;
+  S.books[idx].batches.push({ id: uid(), qty: Number(qty), remaining: Number(qty), buyPrice: Number(buyPrice), date });
+  S.restocks.push({ id: uid(), bookId, bookTitle, qty: Number(qty), buyPrice: Number(buyPrice), date, note: 'Dari Preorder' });
 }

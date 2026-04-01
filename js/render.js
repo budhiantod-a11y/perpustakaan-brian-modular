@@ -849,12 +849,26 @@ export function render() {
     const totalOutstanding = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
     const countOverdue = pos.filter(p=>p.status==='overdue').length;
     const countUnpaid  = pos.filter(p=>p.status==='unpaid').length;
+
+    // deadline urgency helper
+    const deadlineTag = (dueDate, status) => {
+      if (status === 'paid') return '';
+      if (!dueDate) return '';
+      const days = Math.round((new Date(dueDate).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
+      if (days < 0)  return `<span class="po-deadline-tag po-deadline-overdue">⚠ Lewat ${Math.abs(days)} hari</span>`;
+      if (days === 0) return `<span class="po-deadline-tag po-deadline-today">🔴 Jatuh tempo hari ini!</span>`;
+      if (days <= 3)  return `<span class="po-deadline-tag po-deadline-soon">⏰ ${days} hari lagi</span>`;
+      if (days <= 7)  return `<span class="po-deadline-tag po-deadline-week">${days} hari lagi</span>`;
+      return '';
+    };
+
     const cards = filtered.length === 0
       ? `<div class="po-empty">Tidak ada preorder ditemukan</div>`
       : filtered.map(po => {
           const { label, cls } = getStatusLabel(po.status);
           const remaining = po.total - (po.paidAmount||0);
           const isOverdue = po.status==='overdue', isPaid = po.status==='paid';
+          const urgencyTag = deadlineTag(po.dueDate, po.status);
           const itemsList = (po.items||[]).map(item=>`
             <div class="po-card-item">
               <span class="po-card-item-title">${item.title}</span>
@@ -864,14 +878,15 @@ export function render() {
             po.openDate  ? `Open: ${fmtDate(po.openDate)}`   : null,
             po.closeDate ? `Close: ${fmtDate(po.closeDate)}` : null,
             po.readyDate ? `Ready: ${fmtDate(po.readyDate)}` : null,
-            po.dueDate   ? `Bayar: ${fmtDate(po.dueDate)}`   : null,
+            po.dueDate   ? `Deadline: ${fmtDate(po.dueDate)}` : null,
           ].filter(Boolean).join(' · ');
           return `
-            <div class="po-card ${isOverdue?'po-card-overdue':''}">
+            <div class="po-card ${isOverdue?'po-card-overdue':''} ${urgencyTag&&!isOverdue?'po-card-urgent':''}">
               <div class="po-card-header">
                 <div>
                   <span class="po-card-publisher">${po.publisher}</span>
                   ${dates?`<span class="po-card-dates">${dates}</span>`:''}
+                  ${urgencyTag}
                 </div>
                 <span class="inv-status ${cls}">${label}</span>
               </div>
@@ -883,11 +898,11 @@ export function render() {
                   ${remaining>0?`<span class="po-remaining">Sisa: ${fmt(remaining)}</span>`:''}
                 </div>
                 <div class="po-card-actions">
-                  ${isPaid&&!po.bookArrived?`<button class="btn-xs btn-arrive" onclick="openBukuDatang('${po.id}')">📦 Buku Datang</button>`:''}
-                  ${po.bookArrived?`<span class="po-arrived-badge">✓ Stok masuk</span>`:''}
-                  ${!isPaid?`<button class="btn-xs btn-pay" onclick="openQuickPayPo('${po.id}')">Bayar</button>`:''}
-                  <button class="btn-xs btn-edit" onclick="openEditPreorder('${po.id}')">Edit</button>
-                  <button class="btn-xs btn-del"  onclick="deletePreorder('${po.id}')">Hapus</button>
+                  ${!isPaid?`<button class="btn btn-primary btn-sm" onclick="openQuickPayPo('${po.id}')">💳 Bayar</button>`:''}
+                  ${isPaid&&!po.bookArrived?`<button class="btn btn-green btn-sm" onclick="openBukuDatang('${po.id}')">📦 Buku Datang</button>`:''}
+                  ${po.bookArrived?`<span class="badge badge-green" style="font-size:12px">✓ Stok masuk</span>`:''}
+                  <button class="btn btn-ghost btn-sm" onclick="openEditPreorder('${po.id}')">Edit</button>
+                  <button class="btn btn-danger btn-sm" onclick="deletePreorder('${po.id}')">Hapus</button>
                 </div>
               </div>
             </div>`;
@@ -895,7 +910,7 @@ export function render() {
     area.innerHTML = `
       <div class="page-hdr">
         <div><div class="page-title">Preorder Buku</div><div class="page-sub">PO ke penerbit & tracking pembayaran</div></div>
-        <button class="btn-primary" onclick="openAddPreorder()">+ Buat PO</button>
+        <button class="btn btn-primary" onclick="openAddPreorder()">+ Buat PO</button>
       </div>
       <div class="inv-summary-row">
         <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Outstanding</div><div class="inv-summary-value">${fmt(totalOutstanding)}</div></div>
@@ -904,7 +919,7 @@ export function render() {
         <div class="inv-summary-card inv-summary-partial"><div class="inv-summary-label">Total PO</div><div class="inv-summary-value">${pos.length} PO</div></div>
       </div>
       <div class="inv-filters">
-        <input type="text" id="po-search" class="inv-search" placeholder="Cari penerbit atau judul buku..." oninput="render()" value="${searchQ}">
+        <input type="text" id="po-search" class="search-input" placeholder="Cari penerbit atau judul buku..." oninput="render()" value="${searchQ}" style="background-position:10px center">
         <select id="po-filter-status" class="inv-filter-select" onchange="render()">
           <option value="all" ${filterStatus==='all'?'selected':''}>Semua Status</option>
           <option value="overdue" ${filterStatus==='overdue'?'selected':''}>Terlambat</option>
@@ -932,7 +947,7 @@ export function render() {
       if (order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
       return (a.dueDate||a.openDate||'').localeCompare(b.dueDate||b.openDate||'');
     });
-    const totalHutang = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
+    const totalOutstanding = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
     const totalLunas  = pos.filter(p=>p.status==='paid').reduce((s,p)=>s+p.total,0);
     const totalOverdue= pos.filter(p=>p.status==='overdue').length;
     const rows = filtered.length===0
@@ -954,16 +969,16 @@ export function render() {
         }).join('');
     area.innerHTML = `
       <div class="page-hdr">
-        <div><div class="page-title">Cashflow</div><div class="page-sub">Ringkasan hutang PO ke penerbit</div></div>
+        <div><div class="page-title">Cashflow</div><div class="page-sub">Ringkasan outstanding PO ke penerbit</div></div>
       </div>
       <div class="inv-summary-row">
-        <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Hutang</div><div class="inv-summary-value">${fmt(totalHutang)}</div></div>
+        <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Outstanding</div><div class="inv-summary-value">${fmt(totalOutstanding)}</div></div>
         <div class="inv-summary-card inv-summary-overdue"><div class="inv-summary-label">Terlambat</div><div class="inv-summary-value">${totalOverdue} PO</div></div>
         <div class="inv-summary-card inv-summary-paid"><div class="inv-summary-label">Total Sudah Dibayar</div><div class="inv-summary-value">${fmt(totalLunas)}</div></div>
         <div class="inv-summary-card inv-summary-partial"><div class="inv-summary-label">Total PO</div><div class="inv-summary-value">${pos.length} PO</div></div>
       </div>
       <div class="inv-filters">
-        <input type="text" id="cf-search" class="inv-search" placeholder="Cari penerbit..." oninput="render()" value="${searchQ}">
+        <input type="text" id="cf-search" class="search-input" placeholder="Cari penerbit..." oninput="render()" value="${searchQ}" style="background-position:10px center">
         <select id="cf-filter-status" class="inv-filter-select" onchange="render()">
           <option value="all"     ${filterStatus==='all'    ?'selected':''}>Semua Status</option>
           <option value="overdue" ${filterStatus==='overdue'?'selected':''}>Terlambat</option>
