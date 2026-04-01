@@ -912,11 +912,11 @@ export function render() {
         <div><div class="page-title">Preorder Buku</div><div class="page-sub">PO ke penerbit & tracking pembayaran</div></div>
         <button class="btn btn-primary" onclick="openAddPreorder()">+ Buat PO</button>
       </div>
-      <div class="inv-summary-row">
-        <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Outstanding</div><div class="inv-summary-value">${fmt(totalOutstanding)}</div></div>
-        <div class="inv-summary-card inv-summary-overdue"><div class="inv-summary-label">Terlambat Bayar</div><div class="inv-summary-value">${countOverdue} PO</div></div>
-        <div class="inv-summary-card inv-summary-unpaid"><div class="inv-summary-label">Belum Bayar</div><div class="inv-summary-value">${countUnpaid} PO</div></div>
-        <div class="inv-summary-card inv-summary-partial"><div class="inv-summary-label">Total PO</div><div class="inv-summary-value">${pos.length} PO</div></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">💳</div><div class="stat-label">Total Outstanding</div><div class="stat-value" style="color:var(--blue)">${fmt(totalOutstanding)}</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⚠️</div><div class="stat-label">Terlambat Bayar</div><div class="stat-value" style="color:var(--red)">${countOverdue} PO</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fef9c3">🕐</div><div class="stat-label">Belum Bayar</div><div class="stat-value" style="color:var(--amber)">${countUnpaid} PO</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#f5f5f4">📋</div><div class="stat-label">Total PO</div><div class="stat-value">${pos.length} PO</div></div>
       </div>
       <div class="inv-filters">
         <input type="text" id="po-search" class="search-input" placeholder="Cari penerbit atau judul buku..." oninput="render()" value="${searchQ}" style="background-position:10px center">
@@ -971,11 +971,11 @@ export function render() {
       <div class="page-hdr">
         <div><div class="page-title">Cashflow</div><div class="page-sub">Ringkasan outstanding PO ke penerbit</div></div>
       </div>
-      <div class="inv-summary-row">
-        <div class="inv-summary-card inv-summary-outstanding"><div class="inv-summary-label">Total Outstanding</div><div class="inv-summary-value">${fmt(totalOutstanding)}</div></div>
-        <div class="inv-summary-card inv-summary-overdue"><div class="inv-summary-label">Terlambat</div><div class="inv-summary-value">${totalOverdue} PO</div></div>
-        <div class="inv-summary-card inv-summary-paid"><div class="inv-summary-label">Total Sudah Dibayar</div><div class="inv-summary-value">${fmt(totalLunas)}</div></div>
-        <div class="inv-summary-card inv-summary-partial"><div class="inv-summary-label">Total PO</div><div class="inv-summary-value">${pos.length} PO</div></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">💳</div><div class="stat-label">Total Outstanding</div><div class="stat-value" style="color:var(--blue)">${fmt(totalOutstanding)}</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⚠️</div><div class="stat-label">Terlambat</div><div class="stat-value" style="color:var(--red)">${totalOverdue} PO</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#dcfce7">✅</div><div class="stat-label">Total Sudah Dibayar</div><div class="stat-value" style="color:var(--green)">${fmt(totalLunas)}</div></div>
+        <div class="stat-card"><div class="stat-icon" style="background:#f5f5f4">📋</div><div class="stat-label">Total PO</div><div class="stat-value">${pos.length} PO</div></div>
       </div>
       <div class="inv-filters">
         <input type="text" id="cf-search" class="search-input" placeholder="Cari penerbit..." oninput="render()" value="${searchQ}" style="background-position:10px center">

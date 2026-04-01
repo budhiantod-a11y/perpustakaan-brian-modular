@@ -146,7 +146,7 @@ export function savePreorder() {
 // ─── Edit PO ──────────────────────────────────────────────────────────────────
 
 export function openEditPreorder(id) {
-  const po = S.preorders.find(p => p.id === id);
+  const po = S.preorders.find(p => String(p.id) === String(id));
   if (!po) return;
   _poItemCount = po.items.length;
   const itemsHtml = po.items.map((item, idx) =>
@@ -188,7 +188,7 @@ export function openEditPreorder(id) {
 
 export function updatePreorder(id) {
   _poItemCount = 1;
-  const idx = S.preorders.findIndex(p => p.id === id);
+  const idx = S.preorders.findIndex(p => String(p.id) === String(id));
   if (idx === -1) return;
   const publisher = document.getElementById('po-publisher')?.value.trim();
   const openDate  = document.getElementById('po-open-date')?.value  || null;
@@ -205,17 +205,17 @@ export function updatePreorder(id) {
 // ─── Delete PO ────────────────────────────────────────────────────────────────
 
 export function deletePreorder(id) {
-  const po = S.preorders.find(p => p.id === id);
+  const po = S.preorders.find(p => String(p.id) === String(id));
   if (!po) return;
   if (!confirm('Hapus preorder dari "' + po.publisher + '"? Aksi ini tidak bisa dibatalkan.')) return;
-  S.set.preorders(S.preorders.filter(p => p.id !== id));
+  S.set.preorders(S.preorders.filter(p => String(p.id) !== String(id)));
   S.save(); showToast('Preorder dihapus'); _render();
 }
 
 // ─── Quick Pay ────────────────────────────────────────────────────────────────
 
 export function openQuickPayPo(id) {
-  const po = S.preorders.find(p => p.id === id);
+  const po = S.preorders.find(p => String(p.id) === String(id));
   if (!po) return;
   const total     = getPoTotal(po);
   const remaining = total - (po.paidAmount || 0);
@@ -239,7 +239,7 @@ export function openQuickPayPo(id) {
 }
 
 export function saveQuickPayPo(id) {
-  const idx = S.preorders.findIndex(p => p.id === id);
+  const idx = S.preorders.findIndex(p => String(p.id) === String(id));
   if (idx === -1) return;
   const po     = S.preorders[idx];
   const total  = getPoTotal(po);
@@ -255,7 +255,7 @@ export function saveQuickPayPo(id) {
 // ─── Buku Datang → Barcode Flow ───────────────────────────────────────────────
 
 export function openBukuDatang(id) {
-  const po = S.preorders.find(p => p.id === id);
+  const po = S.preorders.find(p => String(p.id) === String(id));
   if (!po) return;
   const itemsHtml = po.items.map((item, idx) =>
     '<div class="buku-datang-row" id="bd-row-' + idx + '">'
@@ -293,7 +293,7 @@ export function bdBarcodeKeydown(e, idx, poId) {
 }
 
 export function confirmBukuDatang(poId) {
-  const poIdx = S.preorders.findIndex(p => p.id === poId);
+  const poIdx = S.preorders.findIndex(p => String(p.id) === String(poId));
   if (poIdx === -1) return;
   const po = S.preorders[poIdx];
   const barcodes = po.items.map((_, idx) => document.getElementById('bd-barcode-' + idx)?.value.trim() || '');
@@ -310,7 +310,7 @@ function openNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
   if (currentIdx >= newBooksNeeded.length) { processRestockAll(poId, barcodes); return; }
   const { barcode, item } = newBooksNeeded[currentIdx];
   const remaining = newBooksNeeded.length - currentIdx;
-  const po = S.preorders.find(p => p.id === poId);
+  const po = S.preorders.find(p => String(p.id) === String(poId));
   openModal(
     '<h2 class="modal-title">Buku Baru — Lengkapi Data</h2>'
     + '<div class="preview-box" style="margin-bottom:16px">'
@@ -344,7 +344,7 @@ export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
   const category    = document.getElementById('nb-category')?.value.trim();
   const normalPrice = Number(document.getElementById('nb-normal-price')?.value) || 0;
   if (!title) return showToast('Judul buku wajib diisi', 'error');
-  const po = S.preorders.find(p => p.id === poId);
+  const po = S.preorders.find(p => String(p.id) === String(poId));
   const item = newBooksNeeded[currentIdx].item;
   const newBook = { id: uid(), barcode, title, author, publisher, category, normalPrice, sellPrice: normalPrice, batches: [] };
   S.books.push(newBook);
@@ -356,7 +356,7 @@ export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
 // ─── Restock all existing books ───────────────────────────────────────────────
 
 function processRestockAll(poId, barcodes) {
-  const poIdx = S.preorders.findIndex(p => p.id === poId);
+  const poIdx = S.preorders.findIndex(p => String(p.id) === String(poId));
   if (poIdx === -1) return;
   const po = S.preorders[poIdx];
   po.items.forEach((item, idx) => {

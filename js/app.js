@@ -196,6 +196,8 @@ Object.assign(window, {
   deletePreorder:     Preorder.deletePreorder,
   openQuickPayPo:     Preorder.openQuickPayPo,
   saveQuickPayPo:     Preorder.saveQuickPayPo,
+  openQuickPayPo:     Preorder.openQuickPayPo,
+  saveQuickPayPo:     Preorder.saveQuickPayPo,
   openBukuDatang:     Preorder.openBukuDatang,
   confirmBukuDatang:  Preorder.confirmBukuDatang,
   bdBarcodeKeydown:   Preorder.bdBarcodeKeydown,
