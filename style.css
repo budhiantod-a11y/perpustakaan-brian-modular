@@ -659,3 +659,108 @@ tbody tr:hover { background: var(--surface2); }
   .page-actions { gap: 6px; }
   .page-actions .btn { font-size: 11px; padding: 5px 10px; }
 }
+/* ═══════════════════════════════════════════════════════════════════════════
+   Preorder & Cashflow Tabs
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Summary cards ── */
+.inv-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 600px) { .inv-summary-row { grid-template-columns: repeat(2, 1fr); } }
+
+.inv-summary-card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 14px 16px;
+  border-left: 4px solid transparent;
+}
+.inv-summary-outstanding { border-left-color: #3b82f6; }
+.inv-summary-overdue     { border-left-color: #ef4444; }
+.inv-summary-unpaid      { border-left-color: #f59e0b; }
+.inv-summary-partial     { border-left-color: #8b5cf6; }
+.inv-summary-paid        { border-left-color: #22c55e; }
+.inv-summary-label { font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+.inv-summary-value { font-size: 18px; font-weight: 700; color: var(--text1); }
+
+/* ── Filters ── */
+.inv-filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.inv-search  { flex: 1; min-width: 180px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); color: var(--text1); font-size: 14px; }
+.inv-filter-select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); color: var(--text1); font-size: 14px; }
+
+/* ── Status badges ── */
+.inv-status  { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.status-paid    { background: #dcfce7; color: #16a34a; }
+.status-partial { background: #ede9fe; color: #7c3aed; }
+.status-unpaid  { background: #fef9c3; color: #b45309; }
+.status-overdue { background: #fee2e2; color: #dc2626; }
+
+/* ── Shared small buttons ── */
+.btn-xs { padding: 4px 10px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+.btn-xs:hover { opacity: .8; }
+.btn-pay    { background: #3b82f6; color: #fff; }
+.btn-arrive { background: #22c55e; color: #fff; }
+.btn-edit   { background: var(--bg2); color: var(--text1); }
+.btn-del    { background: #fee2e2; color: #dc2626; }
+.btn-add-item { background: #ede9fe; color: #7c3aed; }
+
+/* ── PO Cards ── */
+.po-cards { display: flex; flex-direction: column; gap: 14px; }
+.po-empty { text-align: center; padding: 40px; color: var(--text3); font-style: italic; }
+
+.po-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.po-card-overdue { border-left: 3px solid #ef4444; }
+
+.po-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px; }
+.po-card-publisher { display: block; font-weight: 700; font-size: 15px; color: var(--text1); }
+.po-card-dates     { display: block; font-size: 12px; color: var(--text3); margin-top: 3px; }
+
+.po-card-items     { margin-bottom: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.po-card-item      { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.po-card-item-title  { color: var(--text1); }
+.po-card-item-detail { color: var(--text3); }
+
+.po-card-footer  { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.po-card-amounts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--text2); }
+.po-card-amounts strong { color: var(--text1); }
+.po-remaining    { color: #ef4444; font-weight: 600; }
+.po-card-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.po-arrived-badge { font-size: 12px; color: #16a34a; font-weight: 600; }
+
+/* ── PO Item form rows (inside modal) ── */
+.po-items-section { margin: 16px 0; }
+.po-items-header  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.po-item-row      { display: grid; grid-template-columns: 1fr 80px 110px 32px; gap: 8px; margin-bottom: 8px; align-items: center; }
+.po-item-row input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); color: var(--text1); font-size: 13px; width: 100%; box-sizing: border-box; }
+.po-total-preview { text-align: right; font-size: 13px; color: var(--text2); margin-top: 4px; }
+@media (max-width: 500px) { .po-item-row { grid-template-columns: 1fr 32px; } }
+
+/* ── Buku Datang modal ── */
+.buku-datang-list  { display: flex; flex-direction: column; gap: 12px; max-height: 55vh; overflow-y: auto; }
+.buku-datang-row   { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.bd-book-info      { margin-bottom: 8px; }
+.bd-title          { display: block; font-weight: 600; font-size: 14px; color: var(--text1); }
+.bd-qty            { display: block; font-size: 12px; color: var(--text3); }
+.bd-barcode-wrap   { display: flex; align-items: center; gap: 10px; }
+.bd-barcode-input  { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--input); color: var(--text1); font-size: 13px; }
+.bd-barcode-status { font-size: 12px; font-weight: 600; white-space: nowrap; min-width: 80px; }
+.bd-found { color: #16a34a; }
+.bd-new   { color: #f59e0b; }
+.modal-subtitle { font-size: 13px; color: var(--text3); margin-bottom: 12px; }
+
+/* ── Cashflow table ── */
+.inv-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.inv-table th { text-align: left; padding: 10px 12px; background: var(--bg2); color: var(--text3); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); }
+.inv-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.inv-row-overdue td { background: rgba(239,68,68,.05); }
+.inv-supplier  { display: block; font-weight: 600; color: var(--text1); }
+.inv-number    { display: block; font-size: 12px; color: var(--text3); margin-top: 2px; }
+.inv-amount    { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.inv-remaining { color: #ef4444; font-weight: 600; }
+.inv-due       { font-size: 13px; white-space: nowrap; }
+.inv-due-late  { color: #ef4444; font-weight: 600; }
+.inv-empty     { text-align: center; padding: 40px; color: var(--text3); font-style: italic; }
+.cf-note       { font-size: 12px; color: var(--text3); margin-top: 16px; text-align: center; font-style: italic; }
