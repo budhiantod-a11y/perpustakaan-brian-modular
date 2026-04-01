@@ -764,3 +764,35 @@ tbody tr:hover { background: var(--surface2); }
 .inv-due-late  { color: #ef4444; font-weight: 600; }
 .inv-empty     { text-align: center; padding: 40px; color: var(--text3); font-style: italic; }
 .cf-note       { font-size: 12px; color: var(--text3); margin-top: 16px; text-align: center; font-style: italic; }
+
+/* ── Deadline urgency tags ── */
+.po-deadline-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 5px;
+  letter-spacing: .2px;
+}
+.po-deadline-overdue { background: #fee2e2; color: #dc2626; }
+.po-deadline-today   { background: #dc2626; color: #fff; animation: pulse 1s infinite; }
+.po-deadline-soon    { background: #ffedd5; color: #ea580c; }
+.po-deadline-week    { background: #fef9c3; color: #b45309; }
+
+/* ── PO card urgent highlight ── */
+.po-card-urgent { border-left: 3px solid #ea580c; }
+
+/* ── inv-filter-select match existing style ── */
+.inv-filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-s);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+.inv-filter-select:focus { border-color: var(--accent); }
