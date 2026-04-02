@@ -43,16 +43,23 @@ export const set = {
 const LS = 'perpbrian_v1';
 
 function sanitizePreorder(po) {
+  const fixDate = d => {
+    if (!d || typeof d !== 'string') return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const parsed = new Date(d);
+    if (isNaN(parsed)) return null;
+    return parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
+  };
   return {
     id:          String(po.id || ''),
     publisher:   String(po.publisher || ''),
-    openDate:    po.openDate    || null,
-    closeDate:   po.closeDate   || null,
-    readyDate:   po.readyDate   || null,
-    dueDate:     po.dueDate     || null,
+    openDate:    fixDate(po.openDate),
+    closeDate:   fixDate(po.closeDate),
+    readyDate:   fixDate(po.readyDate),
+    dueDate:     fixDate(po.dueDate),
     paidAmount:  Number(po.paidAmount) || 0,
     bookArrived: Boolean(po.bookArrived),
-    lastPayDate: po.lastPayDate || null,
+    lastPayDate: fixDate(po.lastPayDate),
     paymentLog:  (po.paymentLog || []).map(p => ({ amount: Number(p.amount)||0, date: String(p.date||'') })),
     items: (po.items || []).map(i => ({
       id:          String(i.id || ''),
