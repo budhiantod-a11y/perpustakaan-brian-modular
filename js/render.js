@@ -831,104 +831,250 @@ export function render() {
 
   // ── PREORDER ───────────────────────────────────────────────────────────────
   if (S.currentTab === 'preorder') {
-    const fmtDate = d => { if (!d) return '—'; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
+    const fmtDate = d => { if (!d) return null; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
     const pos = (S.preorders || []).map(po => ({ ...po, status: getPoStatus(po), total: getPoTotal(po) }));
     const filterStatus = document.getElementById('po-filter-status')?.value || 'all';
     const searchQ = (document.getElementById('po-search')?.value || '').toLowerCase();
-    const filtered = pos.filter(po => {
+    const poFiltered = pos.filter(po => {
       const matchStatus = filterStatus === 'all' || po.status === filterStatus;
       const matchSearch = !searchQ || po.publisher.toLowerCase().includes(searchQ) ||
         (po.items||[]).some(i => i.title.toLowerCase().includes(searchQ));
       return matchStatus && matchSearch;
     });
-    filtered.sort((a,b) => {
+    poFiltered.sort((a,b) => {
       const order = { overdue:0, unpaid:1, partial:2, paid:3 };
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
       return (a.dueDate||a.openDate||'').localeCompare(b.dueDate||b.openDate||'');
     });
     const totalOutstanding = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
+    const totalPaid    = pos.filter(p=>p.status==='paid').reduce((s,p)=>s+p.total,0);
     const countOverdue = pos.filter(p=>p.status==='overdue').length;
     const countUnpaid  = pos.filter(p=>p.status==='unpaid').length;
 
-    // deadline urgency helper
-    const deadlineTag = (dueDate, status) => {
-      if (status === 'paid') return '';
-      if (!dueDate) return '';
+    // Progress bar helper
+    const payProgress = (po) => {
+      const pct = po.total > 0 ? Math.min(100, Math.round((po.paidAmount||0) / po.total * 100)) : 0;
+      return pct;
+    };
+
+    // Deadline badge helper (cleaner)
+    const deadlineBadge = (dueDate, status) => {
+      if (status === 'paid' || !dueDate) return '';
       const days = Math.round((new Date(dueDate).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
-      if (days < 0)  return `<span class="po-deadline-tag po-deadline-overdue">⚠ Lewat ${Math.abs(days)} hari</span>`;
-      if (days === 0) return `<span class="po-deadline-tag po-deadline-today">🔴 Jatuh tempo hari ini!</span>`;
-      if (days <= 3)  return `<span class="po-deadline-tag po-deadline-soon">⏰ ${days} hari lagi</span>`;
-      if (days <= 7)  return `<span class="po-deadline-tag po-deadline-week">${days} hari lagi</span>`;
+      if (days < 0)  return `<span class="po2-urgency po2-urgency-overdue">Lewat ${Math.abs(days)}h</span>`;
+      if (days === 0) return `<span class="po2-urgency po2-urgency-today">Hari ini!</span>`;
+      if (days <= 3)  return `<span class="po2-urgency po2-urgency-soon">${days} hari lagi</span>`;
+      if (days <= 7)  return `<span class="po2-urgency po2-urgency-week">${days} hari lagi</span>`;
       return '';
     };
 
-    const cards = filtered.length === 0
-      ? `<div class="po-empty">Tidak ada preorder ditemukan</div>`
-      : filtered.map(po => {
-          const { label, cls } = getStatusLabel(po.status);
+    // Status pill config
+    const statusCfg = {
+      paid:    { label: 'Lunas',        dot: '#22c55e', bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
+      partial: { label: 'Bayar Sebagian', dot: '#a78bfa', bg: '#faf5ff', color: '#7c3aed', border: '#e9d5ff' },
+      unpaid:  { label: 'Belum Bayar',  dot: '#fbbf24', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+      overdue: { label: 'Terlambat',    dot: '#f87171', bg: '#fff1f2', color: '#e11d48', border: '#fecdd3' },
+    };
+
+    const poCards = poFiltered.length === 0
+      ? `<div class="po2-empty">
+          <div class="po2-empty-icon">📋</div>
+          <div class="po2-empty-title">Tidak ada preorder ditemukan</div>
+          <div class="po2-empty-sub">${searchQ ? `Tidak ada hasil untuk "${searchQ}"` : 'Buat PO pertama kamu'}</div>
+          ${!searchQ ? `<button class="btn btn-primary" onclick="openAddPreorder()" style="margin-top:16px">+ Buat Preorder</button>` : ''}
+        </div>`
+      : poFiltered.map(po => {
+          const cfg = statusCfg[po.status] || statusCfg.unpaid;
           const remaining = po.total - (po.paidAmount||0);
-          const isOverdue = po.status==='overdue', isPaid = po.status==='paid';
-          const urgencyTag = deadlineTag(po.dueDate, po.status);
-          const itemsList = (po.items||[]).map(item=>`
-            <div class="po-card-item">
-              <span class="po-card-item-title">${item.title}</span>
-              <span class="po-card-item-detail">${item.qty} pcs × ${fmt(item.pricePerPcs)}</span>
+          const isPaid = po.status === 'paid';
+          const isOverdue = po.status === 'overdue';
+          const pct = payProgress(po);
+          const urgBadge = deadlineBadge(po.dueDate, po.status);
+          const bookCount = (po.items||[]).reduce((s,i) => s + Number(i.qty||0), 0);
+
+          // Timeline dots
+          const timeline = [
+            { label: 'Open',     date: fmtDate(po.openDate),  done: !!po.openDate },
+            { label: 'Close',    date: fmtDate(po.closeDate), done: !!po.closeDate },
+            { label: 'Ready',    date: fmtDate(po.readyDate), done: !!po.readyDate },
+            { label: 'Deadline', date: fmtDate(po.dueDate),   done: isPaid },
+          ].filter(t => t.date);
+
+          const timelineHtml = timeline.length ? `
+            <div class="po2-timeline">
+              ${timeline.map((t,i) => `
+                <div class="po2-tl-item ${t.done ? 'po2-tl-done' : ''}">
+                  <div class="po2-tl-dot"></div>
+                  <div class="po2-tl-label">${t.label}</div>
+                  <div class="po2-tl-date">${t.date}</div>
+                </div>
+              `).join('<div class="po2-tl-line"></div>')}
+            </div>` : '';
+
+          const itemsHtml = (po.items||[]).map(item => `
+            <div class="po2-item-row">
+              <span class="po2-item-title">${item.title}</span>
+              <span class="po2-item-meta">${item.qty} pcs · ${fmt(item.pricePerPcs)}/pcs</span>
+              <span class="po2-item-subtotal">${fmt(Number(item.qty) * Number(item.pricePerPcs))}</span>
             </div>`).join('');
-          const dates = [
-            po.openDate  ? `Open: ${fmtDate(po.openDate)}`   : null,
-            po.closeDate ? `Close: ${fmtDate(po.closeDate)}` : null,
-            po.readyDate ? `Ready: ${fmtDate(po.readyDate)}` : null,
-            po.dueDate   ? `Deadline: ${fmtDate(po.dueDate)}` : null,
-          ].filter(Boolean).join(' · ');
+
           return `
-            <div class="po-card ${isOverdue?'po-card-overdue':''} ${urgencyTag&&!isOverdue?'po-card-urgent':''}">
-              <div class="po-card-header">
-                <div>
-                  <span class="po-card-publisher">${po.publisher}</span>
-                  ${dates?`<span class="po-card-dates">${dates}</span>`:''}
-                  ${urgencyTag}
+            <div class="po2-card ${isOverdue ? 'po2-card-overdue' : ''}">
+              <!-- Header -->
+              <div class="po2-card-header">
+                <div class="po2-card-left">
+                  <div class="po2-publisher-row">
+                    <span class="po2-publisher">${po.publisher}</span>
+                    ${urgBadge}
+                  </div>
+                  <div class="po2-meta-row">
+                    <span class="po2-meta-chip">📦 ${bookCount} buku · ${(po.items||[]).length} judul</span>
+                    ${po.bookArrived ? `<span class="po2-meta-chip po2-chip-arrived">✓ Stok masuk</span>` : ''}
+                  </div>
                 </div>
-                <span class="inv-status ${cls}">${label}</span>
+                <div class="po2-status-pill" style="background:${cfg.bg};color:${cfg.color};border-color:${cfg.border}">
+                  <span class="po2-status-dot" style="background:${cfg.dot}"></span>
+                  ${cfg.label}
+                </div>
               </div>
-              <div class="po-card-items">${itemsList}</div>
-              <div class="po-card-footer">
-                <div class="po-card-amounts">
-                  <span>Total: <strong>${fmt(po.total)}</strong></span>
-                  ${po.paidAmount?`<span>Dibayar: ${fmt(po.paidAmount)}</span>`:''}
-                  ${remaining>0?`<span class="po-remaining">Sisa: ${fmt(remaining)}</span>`:''}
+
+              <!-- Timeline -->
+              ${timelineHtml}
+
+              <!-- Book Items (collapsible look) -->
+              <div class="po2-items-section">
+                ${itemsHtml}
+              </div>
+
+              <!-- Payment Progress -->
+              <div class="po2-payment-section">
+                <div class="po2-payment-row">
+                  <div class="po2-payment-info">
+                    <span class="po2-payment-label">Total PO</span>
+                    <span class="po2-payment-total">${fmt(po.total)}</span>
+                  </div>
+                  ${po.paidAmount > 0 ? `
+                  <div class="po2-payment-info" style="text-align:center">
+                    <span class="po2-payment-label">Dibayar</span>
+                    <span class="po2-payment-paid">${fmt(po.paidAmount)}</span>
+                  </div>` : ''}
+                  ${remaining > 0 ? `
+                  <div class="po2-payment-info" style="text-align:right">
+                    <span class="po2-payment-label">Sisa</span>
+                    <span class="po2-payment-remaining">${fmt(remaining)}</span>
+                  </div>` : ''}
                 </div>
-                <div class="po-card-actions">
-                  ${!isPaid?`<button class="btn btn-primary btn-sm" onclick="openQuickPayPo('${po.id}')">💳 Bayar</button>`:''}
-                  ${isPaid&&!po.bookArrived?`<button class="btn btn-green btn-sm" onclick="openBukuDatang('${po.id}')">📦 Buku Datang</button>`:''}
-                  ${po.bookArrived?`<span class="badge badge-green" style="font-size:12px">✓ Stok masuk</span>`:''}
-                  <button class="btn btn-ghost btn-sm" onclick="openEditPreorder('${po.id}')">Edit</button>
-                  <button class="btn btn-danger btn-sm" onclick="deletePreorder('${po.id}')">Hapus</button>
+                ${po.total > 0 ? `
+                <div class="po2-progress-wrap">
+                  <div class="po2-progress-bar" style="width:${pct}%;background:${isPaid ? '#22c55e' : isOverdue ? '#f87171' : cfg.dot}"></div>
+                </div>
+                <div class="po2-progress-label">${pct}% terbayar</div>` : ''}
+              </div>
+
+              <!-- Actions -->
+              <div class="po2-actions">
+                <div class="po2-actions-left">
+                  ${!isPaid ? `<button class="po2-btn po2-btn-pay" onclick="openQuickPayPo('${po.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    Bayar
+                  </button>` : ''}
+                  ${isPaid && !po.bookArrived ? `<button class="po2-btn po2-btn-arrive" onclick="openBukuDatang('${po.id}')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><polyline points="16,21 12,17 8,21"/></svg>
+                    Buku Datang
+                  </button>` : ''}
+                </div>
+                <div class="po2-actions-right">
+                  <button class="po2-btn-icon" onclick="openEditPreorder('${po.id}')" title="Edit PO">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="po2-btn-icon po2-btn-icon-del" onclick="deletePreorder('${po.id}')" title="Hapus PO">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
                 </div>
               </div>
             </div>`;
         }).join('');
+
     area.innerHTML = `
-      <div class="page-hdr">
-        <div><div class="page-title">Preorder Buku</div><div class="page-sub">PO ke penerbit & tracking pembayaran</div></div>
-        <button class="btn btn-primary" onclick="openAddPreorder()">+ Buat PO</button>
+      <div class="po2-page-hdr">
+        <div>
+          <div class="page-title">Preorder Buku</div>
+          <div class="page-sub">Kelola PO ke penerbit & track pembayaran</div>
+        </div>
+        <button class="po2-btn-create" onclick="openAddPreorder()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Buat PO Baru
+        </button>
       </div>
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">💳</div><div class="stat-label">Total Outstanding</div><div class="stat-value" style="color:var(--blue)">${fmt(totalOutstanding)}</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⚠️</div><div class="stat-label">Terlambat Bayar</div><div class="stat-value" style="color:var(--red)">${countOverdue} PO</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#fef9c3">🕐</div><div class="stat-label">Belum Bayar</div><div class="stat-value" style="color:var(--amber)">${countUnpaid} PO</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#f5f5f4">📋</div><div class="stat-label">Total PO</div><div class="stat-value">${pos.length} PO</div></div>
+
+      <!-- KPI Strip -->
+      <div class="po2-kpi-strip">
+        <div class="po2-kpi-card po2-kpi-outstanding">
+          <div class="po2-kpi-icon">💳</div>
+          <div>
+            <div class="po2-kpi-label">Outstanding</div>
+            <div class="po2-kpi-value">${fmt(totalOutstanding)}</div>
+          </div>
+        </div>
+        <div class="po2-kpi-card po2-kpi-overdue">
+          <div class="po2-kpi-icon">⚠</div>
+          <div>
+            <div class="po2-kpi-label">Terlambat</div>
+            <div class="po2-kpi-value">${countOverdue} <span style="font-size:13px;font-weight:500">PO</span></div>
+          </div>
+        </div>
+        <div class="po2-kpi-card po2-kpi-unpaid">
+          <div class="po2-kpi-icon">⏳</div>
+          <div>
+            <div class="po2-kpi-label">Belum Bayar</div>
+            <div class="po2-kpi-value">${countUnpaid} <span style="font-size:13px;font-weight:500">PO</span></div>
+          </div>
+        </div>
+        <div class="po2-kpi-card po2-kpi-total">
+          <div class="po2-kpi-icon">📋</div>
+          <div>
+            <div class="po2-kpi-label">Total Lunas</div>
+            <div class="po2-kpi-value">${fmt(totalPaid)}</div>
+          </div>
+        </div>
       </div>
-      <div class="inv-filters">
-        <input type="text" id="po-search" class="search-input" placeholder="Cari penerbit atau judul buku..." oninput="render()" value="${searchQ}" style="background-position:10px center">
-        <select id="po-filter-status" class="inv-filter-select" onchange="render()">
-          <option value="all" ${filterStatus==='all'?'selected':''}>Semua Status</option>
-          <option value="overdue" ${filterStatus==='overdue'?'selected':''}>Terlambat</option>
-          <option value="unpaid"  ${filterStatus==='unpaid'?'selected':''}>Belum Bayar</option>
-          <option value="partial" ${filterStatus==='partial'?'selected':''}>Bayar Sebagian</option>
-          <option value="paid"    ${filterStatus==='paid'?'selected':''}>Lunas</option>
+
+      <!-- Filters -->
+      <div class="po2-toolbar">
+        <div style="position:relative;flex:1;min-width:180px">
+          <svg style="position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a8a29e" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="po2-search" type="text" id="po-search" placeholder="Cari penerbit, judul buku..." oninput="render()" value="${searchQ}">
+        </div>
+        <div class="po2-tabs">
+          ${['all','overdue','unpaid','partial','paid'].map(s => {
+            const labels = {all:'Semua',overdue:'Terlambat',unpaid:'Belum Bayar',partial:'Sebagian',paid:'Lunas'};
+            const counts = {
+              all: pos.length,
+              overdue: pos.filter(p=>p.status==='overdue').length,
+              unpaid:  pos.filter(p=>p.status==='unpaid').length,
+              partial: pos.filter(p=>p.status==='partial').length,
+              paid:    pos.filter(p=>p.status==='paid').length,
+            };
+            return `<button class="po2-tab ${filterStatus===s?'po2-tab-active':''}" onclick="document.getElementById('po-filter-status').value='${s}';render()">
+              ${labels[s]}${counts[s]>0?`<span class="po2-tab-count">${counts[s]}</span>`:''}
+            </button>`;
+          }).join('')}
+        </div>
+        <select id="po-filter-status" style="display:none" onchange="render()">
+          <option value="all">all</option>
+          <option value="overdue">overdue</option>
+          <option value="unpaid">unpaid</option>
+          <option value="partial">partial</option>
+          <option value="paid">paid</option>
         </select>
       </div>
-      <div class="po-cards">${cards}</div>`;
+
+      <!-- Cards Grid -->
+      <div class="po2-grid">${poCards}</div>`;
+
+    // Set hidden select value to match active tab
+    const sel = document.getElementById('po-filter-status');
+    if (sel) sel.value = filterStatus;
   }
 
   // ── CASHFLOW ───────────────────────────────────────────────────────────────
