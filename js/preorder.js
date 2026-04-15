@@ -302,14 +302,14 @@ export function confirmBukuDatang(poId) {
   if (barcodes.some(b => !b)) return showToast('Semua buku harus diisi barcodenya', 'error');
   const newBooks = po.items.map((item, idx) => ({ idx, barcode: barcodes[idx], item }))
     .filter(({ barcode }) => !S.books.find(b => b.barcode === barcode));
-  if (newBooks.length > 0) { openNewBookFromPo(poId, newBooks, 0, barcodes); return; }
-  processRestockAll(poId, barcodes);
+  if (newBooks.length > 0) { openNewBookFromPo(poId, newBooks, 0, barcodes, []); return; }
+  processRestockAll(poId, barcodes, []);
 }
 
 // ─── New Book Form (from PO context) ──────────────────────────────────────────
 
-function openNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
-  if (currentIdx >= newBooksNeeded.length) { processRestockAll(poId, barcodes); return; }
+function openNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes, alreadyRestocked) {
+  if (currentIdx >= newBooksNeeded.length) { processRestockAll(poId, barcodes, alreadyRestocked); return; }
   const { barcode, item } = newBooksNeeded[currentIdx];
   const remaining = newBooksNeeded.length - currentIdx;
   const po = S.preorders.find(p => String(p.id) === String(poId));
@@ -332,13 +332,13 @@ function openNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
     + '</div>'
     + '<div class="modal-footer">'
     + '<button class="btn btn-ghost" onclick="closeModal()">Batal</button>'
-    + '<button class="btn btn-primary" onclick="saveNewBookFromPo(\'' + poId + '\',' + JSON.stringify(newBooksNeeded).replace(/"/g,'&quot;') + ',' + currentIdx + ',' + JSON.stringify(barcodes).replace(/"/g,'&quot;') + ')">'
+    + '<button class="btn btn-primary" onclick="saveNewBookFromPo(\'' + poId + '\',' + JSON.stringify(newBooksNeeded).replace(/"/g,'&quot;') + ',' + currentIdx + ',' + JSON.stringify(barcodes).replace(/"/g,'&quot;') + ',' + JSON.stringify(alreadyRestocked).replace(/"/g,'&quot;') + ')">'
     + 'Simpan & Lanjut' + (remaining > 1 ? ' (' + (currentIdx+1) + '/' + newBooksNeeded.length + ')' : '') + '</button>'
     + '</div>'
   );
 }
 
-export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
+export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes, alreadyRestocked) {
   const barcode     = document.getElementById('nb-barcode')?.value.trim();
   const title       = document.getElementById('nb-title')?.value.trim();
   const author      = document.getElementById('nb-author')?.value.trim();
@@ -351,18 +351,21 @@ export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes) {
   const newBook = { id: uid(), barcode, title, author, publisher, category, normalPrice, sellPrice: normalPrice, batches: [] };
   S.books.push(newBook);
   addRestockBatch(newBook.id, title, item.qty, item.pricePerPcs, po?.openDate || today());
+  alreadyRestocked.push(barcode);
   S.save(); showToast('"' + title + '" ditambahkan ✓');
-  openNewBookFromPo(poId, newBooksNeeded, currentIdx + 1, barcodes);
+  openNewBookFromPo(poId, newBooksNeeded, currentIdx + 1, barcodes, alreadyRestocked);
 }
 
 // ─── Restock all existing books ───────────────────────────────────────────────
 
-function processRestockAll(poId, barcodes) {
+function processRestockAll(poId, barcodes, alreadyRestocked) {
   const poIdx = S.preorders.findIndex(p => String(p.id) === String(poId));
   if (poIdx === -1) return;
   const po = S.preorders[poIdx];
   po.items.forEach((item, idx) => {
-    const book = S.books.find(b => b.barcode === barcodes[idx]);
+    const barcode = barcodes[idx];
+    if (alreadyRestocked.includes(barcode)) return; // skip — sudah di-restock via saveNewBookFromPo
+    const book = S.books.find(b => b.barcode === barcode);
     if (book) addRestockBatch(book.id, book.title, item.qty, item.pricePerPcs, po.openDate || today());
   });
   S.preorders[poIdx] = { ...po, bookArrived: true };
