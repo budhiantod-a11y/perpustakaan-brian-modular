@@ -10,12 +10,13 @@ import { showToast, closeModal, fmt } from './helpers.js';
 import { totalStock, fifoSim } from './fifo.js';
 import { render } from './render.js';
 
-import * as Books from './books.js';
-import * as Sales from './sales.js';
-import * as Scanner from './scanner.js';
-import * as Import from './import.js';
-import * as Sync from './sync.js';
+import * as Books    from './books.js';
+import * as Sales    from './sales.js';
+import * as Scanner  from './scanner.js';
+import * as Import   from './import.js';
+import * as Sync     from './sync.js';
 import * as Preorder from './preorder.js';
+import * as Cashflow from './cashflow.js';
 
 // ── Initialize modules with render callback ──────────────────────────────────
 Books.init(render);
@@ -24,6 +25,12 @@ Scanner.init(render);
 Import.init(render);
 Sync.init(render);
 Preorder.init(render);
+Cashflow.init(render);
+
+// ── Expose cashflow helpers to render.js via window (render.js uses window._cf*) ──
+window._cfBuildLedger    = Cashflow.buildLedger;
+window._cfCalcSummary    = Cashflow.calcSummary;
+window._cfCategoryLabels = Cashflow.CATEGORY_LABELS;
 
 // ── goTab ────────────────────────────────────────────────────────────────────
 function goTab(tab, btn) {
@@ -78,7 +85,6 @@ Object.assign(window, {
   goTab,
 
   // Period changes (used in dashboard/laporan date inputs)
-  // These are inline lambdas so we define them here
   setPeriodFrom(v) { S.period.from = v; S.save(); render(); },
   setPeriodTo(v)   { S.period.to = v;   S.save(); render(); },
 
@@ -135,7 +141,6 @@ Object.assign(window, {
   saveBundleSale:     Sales.saveBundleSale,
   setBundlePrice(v)   {
     S.set.bundlePrice(v);
-    // Update profit display in-place (no modal rebuild = no cursor jump)
     const profitEl = document.getElementById('bundle-profit-display');
     if (profitEl) {
       let totalHPP = 0;
@@ -150,7 +155,6 @@ Object.assign(window, {
       profitEl.textContent = fmt(profit);
       profitEl.style.color = profit >= 0 ? 'var(--green)' : 'var(--red)';
     }
-    // Update submit button disabled state
     const btn = document.getElementById('bundle-submit-btn');
     if (btn) {
       const canSubmit = S.bundleItems.length && v > 0;
@@ -182,29 +186,38 @@ Object.assign(window, {
   unselectAllImport() { S.importRows.forEach(r=>r._checked=false); render(); },
 
   // Sync
-  openSyncSettings:   Sync.openSyncSettings,
-  testGsConnection:   Sync.testGsConnection,
-  testGsPost:         Sync.testGsPost,
+  openSyncSettings:    Sync.openSyncSettings,
+  testGsConnection:    Sync.testGsConnection,
+  testGsPost:          Sync.testGsPost,
   loadFromSheetsModal: Sync.loadFromSheetsModal,
-  saveGsUrl:          Sync.saveGsUrl,
+  saveGsUrl:           Sync.saveGsUrl,
 
   // Preorder
-  openAddPreorder:    Preorder.openAddPreorder,
-  savePreorder:       Preorder.savePreorder,
-  openEditPreorder:   Preorder.openEditPreorder,
-  updatePreorder:     Preorder.updatePreorder,
-  deletePreorder:     Preorder.deletePreorder,
-  openQuickPayPo:     Preorder.openQuickPayPo,
-  saveQuickPayPo:     Preorder.saveQuickPayPo,
-  openQuickPayPo:     Preorder.openQuickPayPo,
-  saveQuickPayPo:     Preorder.saveQuickPayPo,
-  openBukuDatang:     Preorder.openBukuDatang,
-  confirmBukuDatang:  Preorder.confirmBukuDatang,
-  bdBarcodeKeydown:   Preorder.bdBarcodeKeydown,
-  saveNewBookFromPo:  Preorder.saveNewBookFromPo,
-  poAddItem:          Preorder.poAddItem,
-  poRemoveItem:       Preorder.poRemoveItem,
-  poUpdateTotal:      Preorder.poUpdateTotal,
+  openAddPreorder:   Preorder.openAddPreorder,
+  savePreorder:      Preorder.savePreorder,
+  openEditPreorder:  Preorder.openEditPreorder,
+  updatePreorder:    Preorder.updatePreorder,
+  deletePreorder:    Preorder.deletePreorder,
+  openQuickPayPo:    Preorder.openQuickPayPo,
+  saveQuickPayPo:    Preorder.saveQuickPayPo,
+  openBukuDatang:    Preorder.openBukuDatang,
+  confirmBukuDatang: Preorder.confirmBukuDatang,
+  bdBarcodeKeydown:  Preorder.bdBarcodeKeydown,
+  saveNewBookFromPo: Preorder.saveNewBookFromPo,
+  poAddItem:         Preorder.poAddItem,
+  poRemoveItem:      Preorder.poRemoveItem,
+  poUpdateTotal:     Preorder.poUpdateTotal,
+
+  // Cashflow
+  openAddCashflow:   Cashflow.openAddCashflow,
+  saveCashflow:      Cashflow.saveCashflow,
+  openEditCashflow:  Cashflow.openEditCashflow,
+  updateCashflow:    Cashflow.updateCashflow,
+  deleteCashflow:    Cashflow.deleteCashflow,
+  cfMarkDelivered:   Cashflow.markDelivered,
+  cfSetType:         Cashflow.cfSetType,
+  cfOnCategoryChange:Cashflow.cfOnCategoryChange,
+  cfOnAdvanceChange: Cashflow.cfOnAdvanceChange,
 
   // Helpers
   closeModal,
@@ -215,11 +228,10 @@ Object.assign(window, {
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot — Phase 2: Sheets-first with localStorage fallback
 // ═══════════════════════════════════════════════════════════════════════════
-S.load();           // 1. Load localStorage instantly
+S.load();
 Scanner.setupKeyboardScanner();
-render();           // 2. Render immediately (fast boot)
+render();
 
-// 3. If GSheets URL configured, fetch from Sheets in background
 if (S.gsUrl) {
   const banner = document.getElementById('sync-banner');
   if (banner) { banner.style.display = 'flex'; banner.className = 'sync-banner syncing'; banner.innerHTML = '<span class="sync-banner-dot"></span> Mengambil data dari Google Sheets…'; }
@@ -227,7 +239,6 @@ if (S.gsUrl) {
 
   S.fetchFromSheetsOnBoot().then(result => {
     if (result.ok) {
-      // Sheets data overwrites localStorage — re-render
       render();
       S.updateSyncUI('connected');
       if (banner) { banner.className = 'sync-banner synced'; banner.innerHTML = '✓ Data dari Google Sheets berhasil dimuat'; setTimeout(() => banner.style.display = 'none', 3000); }

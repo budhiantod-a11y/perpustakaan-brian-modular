@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Core data ────────────────────────────────────────────────────────────────
-export let books = [], sales = [], restocks = [], preorders = [];
+export let books = [], sales = [], restocks = [], preorders = [], cashflows = [];
 function localDate() {
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -24,7 +24,9 @@ export let bundleItems = [], bundlePrice = 0, bundleNote = '';
 
 // ── Setters (needed because only declaring module can reassign) ──────────────
 export const set = {
-  books(v){ books=v; }, sales(v){ sales=v; }, restocks(v){ restocks=v; }, preorders(v){ preorders=v; }, period(v){ period=v; },
+  books(v){ books=v; }, sales(v){ sales=v; }, restocks(v){ restocks=v; },
+  preorders(v){ preorders=v; }, cashflows(v){ cashflows=v; },
+  period(v){ period=v; },
   currentTab(v){ currentTab=v; }, stokSearch(v){ stokSearch=v; }, stokPub(v){ stokPub=v; },
   stokCat(v){ stokCat=v; }, searchDebounceTimer(v){ searchDebounceTimer=v; },
   scannerJustFired(v){ scannerJustFired=v; }, scanMode(v){ scanMode=v; },
@@ -70,11 +72,37 @@ function sanitizePreorder(po) {
   };
 }
 
+function sanitizeCashflow(cf) {
+  const fixDate = d => {
+    if (!d || typeof d !== 'string') return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const parsed = new Date(d);
+    if (isNaN(parsed)) return null;
+    return parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
+  };
+  return {
+    id:        String(cf.id || ''),
+    date:      fixDate(cf.date),
+    type:      cf.type === 'expense' ? 'expense' : 'income',
+    category:  String(cf.category || 'lainnya'),
+    amount:    Number(cf.amount) || 0,
+    note:      String(cf.note || ''),
+    isAdvance: Boolean(cf.isAdvance),
+    delivered: cf.isAdvance ? Boolean(cf.delivered) : true,
+    source:    'manual',
+  };
+}
+
 export function load() {
   try {
     const d = JSON.parse(localStorage.getItem(LS));
     if (d && Array.isArray(d.books)) {
-      books = d.books; sales = d.sales||[]; restocks = d.restocks||[]; preorders = (d.preorders||[]).map(sanitizePreorder); period = d.period||period;
+      books     = d.books;
+      sales     = d.sales     || [];
+      restocks  = d.restocks  || [];
+      preorders = (d.preorders || []).map(sanitizePreorder);
+      cashflows = (d.cashflows || []).map(sanitizeCashflow);
+      period    = d.period    || period;
       return true;
     }
   } catch(e) {}
@@ -82,8 +110,9 @@ export function load() {
 }
 
 export function save() {
-  try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, period })); }
-  catch(e) { console.warn('localStorage save failed'); }
+  try {
+    localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, period }));
+  } catch(e) { console.warn('localStorage save failed'); }
   scheduleSync();
 }
 
@@ -121,13 +150,13 @@ export async function syncToSheets(showFeedback=false) {
   updateSyncUI('syncing');
   try {
     const res = await fetch(gsUrl, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders } }), redirect:'follow' });
+      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders, cashflows } }), redirect:'follow' });
     const json = JSON.parse(await res.text());
     if (json.ok) { updateSyncUI('connected'); if(showFeedback) console.log('Sync OK'); return; }
     throw new Error(json.error);
   } catch(err) {
     try {
-      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders }));
+      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders, cashflows }));
       const json2 = await (await fetch(`${gsUrl}?action=sync&payload=${enc}`, {redirect:'follow'})).json();
       if (json2.ok) { updateSyncUI('connected'); return; }
     } catch(e2) {}
@@ -162,10 +191,11 @@ export async function loadFromSheets() {
         date: fixDate(s.date),
         bundleItems: (s.bundleItems||[]).map(i => ({ ...i, bookId: num(i.bookId)||i.bookId, qty: num(i.qty), cogs: num(i.cogs), buyPrice: num(i.buyPrice) })),
       }));
-      restocks = (json.data.restocks||[]).map(r => ({
+      restocks  = (json.data.restocks||[]).map(r => ({
         ...r, id: num(r.id)||r.id, bookId: num(r.bookId)||r.bookId, qty: num(r.qty), buyPrice: num(r.buyPrice), date: fixDate(r.date),
       }));
       preorders = (json.data.preorders||[]).map(sanitizePreorder);
+      cashflows = (json.data.cashflows||[]).map(sanitizeCashflow);
       save(); updateSyncUI('connected'); return true;
     }
   } catch(e) {}
@@ -184,7 +214,6 @@ export async function fetchFromSheetsOnBoot() {
     clearTimeout(timeout);
     const json = JSON.parse(await res.text());
     if (json.ok && json.data) {
-      // Sanitize dates — GSheets may return Date objects as long strings
       const fixDate = d => {
         if (!d || typeof d !== 'string') return localDate();
         if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
@@ -248,11 +277,18 @@ export async function fetchFromSheetsOnBoot() {
       // Sanitize preorders
       const sheetPreorders = (json.data.preorders||[]).map(sanitizePreorder);
 
+      // Sanitize cashflows
+      const sheetCashflows = (json.data.cashflows||[]).map(sanitizeCashflow);
+
       // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
       if (sheetBooks.length > 0 || sheetSales.length > 0) {
-        books = sheetBooks; sales = sheetSales; restocks = sheetRestocks; preorders = sheetPreorders;
+        books     = sheetBooks;
+        sales     = sheetSales;
+        restocks  = sheetRestocks;
+        preorders = sheetPreorders;
+        cashflows = sheetCashflows;
         // Save to localStorage (but scheduleSync is blocked, so won't push back to Sheets)
-        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, period })); }
+        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, period })); }
         catch(e) {}
       }
       bootFetching = false;
