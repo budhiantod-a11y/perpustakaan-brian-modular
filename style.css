@@ -35,6 +35,7 @@ body {
   color: var(--text);
   line-height: 1.5;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* ── TOP NAV ── */
@@ -840,9 +841,9 @@ tbody tr:hover { background: var(--surface2); }
 /* Mobile: collapse to cards */
 @media (max-width: 768px) {
   .po-table colgroup, .po-table thead { display: none; }
-  .po-table, .po-table tbody { display: block; }
-  .po-main-row { display: block; }
-  .po-main-row td { display: block; padding: 8px 12px; border: none; cursor: default; }
+  .po-table tbody { display: block; }
+  .po-main-row { display: block; width: 100%; }
+  .po-main-row td { display: block; width: 100%; padding: 8px 12px; border: none; cursor: default; box-sizing: border-box; }
   .po-main-row {
     border: 1px solid var(--border);
     border-radius: var(--radius-s);
