@@ -51,10 +51,20 @@ export function render() {
 
       <div class="save-notice"><div class="save-dot"></div>Data tersimpan di browser ini · <strong style="color:var(--text2)">${S.books.length} buku</strong> terdaftar</div>
 
-      ${lowStock.length ? `<div class="alert-bar">
-        <span style="flex-shrink:0">⚠ Stok hampir habis:</span>
-        <div class="low-stock-chips">
-          ${lowStock.map(b=>`<span class="low-chip">${b.title} <strong>(${totalStock(b)})</strong></span>`).join('')}
+      ${lowStock.length ? `<div class="alert-bar" id="alert-bar-wrap">
+        <div class="alert-bar-toggle" onclick="
+          const body=document.getElementById('alert-bar-body');
+          const chev=document.getElementById('alert-bar-chev');
+          body.classList.toggle('open');
+          chev.classList.toggle('open');
+        ">
+          <span>⚠ Stok hampir habis: <strong>${lowStock.length} buku</strong></span>
+          <span class="alert-bar-chevron" id="alert-bar-chev">▼</span>
+        </div>
+        <div class="alert-bar-body" id="alert-bar-body">
+          <div class="low-stock-chips" style="margin-top:8px">
+            ${lowStock.map(b=>`<span class="low-chip">${b.title} <strong>(${totalStock(b)})</strong></span>`).join('')}
+          </div>
         </div>
       </div>` : ''}
 
@@ -1008,34 +1018,30 @@ export function render() {
       </div>
 
       <!-- KPI Strip -->
-      <div class="po2-kpi-strip">
-        <div class="po2-kpi-card po2-kpi-outstanding">
-          <div class="po2-kpi-icon">💳</div>
-          <div>
-            <div class="po2-kpi-label">Outstanding</div>
-            <div class="po2-kpi-value">${fmt(totalOutstanding)}</div>
-          </div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#dbeafe">💳</div>
+          <div class="stat-label">Outstanding</div>
+          <div class="stat-value" style="color:#2563eb">${fmt(totalOutstanding)}</div>
+          <div class="stat-sub">Belum lunas</div>
         </div>
-        <div class="po2-kpi-card po2-kpi-overdue">
-          <div class="po2-kpi-icon">⚠</div>
-          <div>
-            <div class="po2-kpi-label">Terlambat</div>
-            <div class="po2-kpi-value">${countOverdue} <span style="font-size:13px;font-weight:500">PO</span></div>
-          </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fff1f2">⚠️</div>
+          <div class="stat-label">Terlambat</div>
+          <div class="stat-value" style="color:#e11d48">${countOverdue} <span style="font-size:14px;font-weight:500">PO</span></div>
+          <div class="stat-sub">Lewat deadline</div>
         </div>
-        <div class="po2-kpi-card po2-kpi-unpaid">
-          <div class="po2-kpi-icon">⏳</div>
-          <div>
-            <div class="po2-kpi-label">Belum Bayar</div>
-            <div class="po2-kpi-value">${countUnpaid} <span style="font-size:13px;font-weight:500">PO</span></div>
-          </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fffbeb">⏳</div>
+          <div class="stat-label">Belum Bayar</div>
+          <div class="stat-value" style="color:#b45309">${countUnpaid} <span style="font-size:14px;font-weight:500">PO</span></div>
+          <div class="stat-sub">Perlu dibayar</div>
         </div>
-        <div class="po2-kpi-card po2-kpi-total">
-          <div class="po2-kpi-icon">📋</div>
-          <div>
-            <div class="po2-kpi-label">Total Lunas</div>
-            <div class="po2-kpi-value">${fmt(totalPaid)}</div>
-          </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#f0fdf4">✅</div>
+          <div class="stat-label">Total Lunas</div>
+          <div class="stat-value" style="color:#16a34a">${fmt(totalPaid)}</div>
+          <div class="stat-sub">Sudah dibayar</div>
         </div>
       </div>
 
@@ -1078,7 +1084,7 @@ export function render() {
   }
 
   // ── CASHFLOW ───────────────────────────────────────────────────────────────
- if (S.currentTab === 'cashflow') {
+  if (S.currentTab === 'cashflow') {
     // Import helpers from cashflow module (available via window bridge)
     const ledger  = window._cfBuildLedger  ? window._cfBuildLedger(S.period.from, S.period.to)  : [];
     const summary = window._cfCalcSummary  ? window._cfCalcSummary(ledger) : { totalCashIn:0, totalCashOut:0, netCashflow:0, dpPending:0 };
@@ -1263,7 +1269,7 @@ export function render() {
       </p>`;
   }
 
-  // Reset scanner flag after each render
+    // Reset scanner flag after each render
   setTimeout(() => { S.set.scannerJustFired(false); }, 100);
 
   // Keep focus on search input after render so scanner can fire again
