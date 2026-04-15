@@ -707,7 +707,7 @@ tbody tr:hover { background: var(--surface2); }
 
 
 /* ── PREORDER TABLE ── */
-.po-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.po-table { width: 100%; border-collapse: collapse; }
 .po-table thead th {
   padding: 10px 14px; font-size: 11px; font-weight: 700; color: var(--text3);
   text-transform: uppercase; letter-spacing: .5px;
@@ -763,7 +763,7 @@ tbody tr:hover { background: var(--surface2); }
 }
 
 /* Col 4 & 5: Amounts */
-.po-col-number { text-align: left; vertical-align: middle; white-space: nowrap; }
+.po-col-total, .po-col-sisa { text-align: left; vertical-align: middle; white-space: nowrap; }
 .po-amount-total { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
 .po-amount-sub   { font-size: 11px; color: var(--green); display: block; margin-top: 1px; }
 .po-amount-sisa  { font-size: 13px; font-weight: 700; color: #e11d48; }
@@ -849,9 +849,18 @@ tbody tr:hover { background: var(--surface2); }
     overflow: hidden;
   }
   .po-main-row td { padding: 8px 12px; border: none; cursor: default; }
-  .po-col-date::before   { content: "Payment Deadline: "; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; }
-  .po-col-amount { text-align: left; }
-  .po-th-right { text-align: left !important; }
+  .po-col-total::before {
+    content: "Total PO  ";
+    font-size: 10px; font-weight: 700; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px;
+  }
+  .po-col-sisa::before {
+    content: "Sisa  ";
+    font-size: 10px; font-weight: 700; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px;
+  }
+  .po-col-action-primary  { display: block; }
+  .po-col-action-secondary{ display: flex; gap: 8px; padding-top: 4px; }
   .po-detail-grid { grid-template-columns: 1fr; gap: 16px; }
   .po-detail-inner { padding: 12px 14px; }
   .po-item-line-title { max-width: 180px; }
