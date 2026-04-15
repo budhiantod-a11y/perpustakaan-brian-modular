@@ -865,7 +865,6 @@ export function render() {
     const countOverdue = pos.filter(p=>p.status==='overdue').length;
     const countUnpaid  = pos.filter(p=>p.status==='unpaid').length;
 
-    // Status config
     const statusCfg = {
       paid:    { label: 'Lunas',          dot: '#22c55e', bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
       partial: { label: 'Bayar Sebagian', dot: '#a78bfa', bg: '#faf5ff', color: '#7c3aed', border: '#e9d5ff' },
@@ -873,7 +872,6 @@ export function render() {
       overdue: { label: 'Terlambat',      dot: '#f87171', bg: '#fff1f2', color: '#e11d48', border: '#fecdd3' },
     };
 
-    // Urgency badge
     const urgBadge = (dueDate, status) => {
       if (status === 'paid' || !dueDate) return '';
       const days = Math.round((new Date(dueDate).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
@@ -884,9 +882,8 @@ export function render() {
       return '';
     };
 
-    // Table rows
     const tableRows = poFiltered.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text3);font-size:13px">
+      ? `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text3);font-size:13px">
           ${searchQ ? `Tidak ada hasil untuk "${searchQ}"` : 'Belum ada preorder. Buat PO pertama kamu.'}
          </td></tr>`
       : poFiltered.map(po => {
@@ -895,8 +892,9 @@ export function render() {
           const isPaid    = po.status === 'paid';
           const isOverdue = po.status === 'overdue';
           const bookCount = (po.items||[]).reduce((s,i) => s + Number(i.qty||0), 0);
+          const pct       = po.total > 0 ? Math.min(100, Math.round((po.paidAmount||0) / po.total * 100)) : 0;
 
-          // Item list — inline stacked
+          // Item list
           const itemsHtml = (po.items||[]).map(item =>
             `<div class="po-row-item">
               <span class="po-row-item-title">${item.title}</span>
@@ -904,9 +902,38 @@ export function render() {
             </div>`
           ).join('');
 
-          return `
-            <tr class="po-row${isOverdue ? ' po-row-overdue' : ''}">
-              <!-- Penerbit + urgency + items -->
+          // Expand detail row (dates + progress)
+          const expandId = 'po-expand-' + po.id;
+          const dateItems = [
+            po.openDate  ? `<div class="po-date-item"><span class="po-date-label">Open</span><span class="po-date-val">${fmtDate(po.openDate)}</span></div>`  : '',
+            po.closeDate ? `<div class="po-date-item"><span class="po-date-label">Close</span><span class="po-date-val">${fmtDate(po.closeDate)}</span></div>` : '',
+            po.readyDate ? `<div class="po-date-item"><span class="po-date-label">Ready</span><span class="po-date-val">${fmtDate(po.readyDate)}</span></div>` : '',
+            po.dueDate   ? `<div class="po-date-item"><span class="po-date-label">Deadline</span><span class="po-date-val">${fmtDate(po.dueDate)}</span></div>` : '',
+          ].filter(Boolean).join('');
+
+          const expandRow = `
+            <tr class="po-expand-row" id="${expandId}" style="display:none">
+              <td colspan="7" class="po-expand-cell">
+                <div class="po-expand-inner">
+                  <div class="po-expand-dates">${dateItems}</div>
+                  ${po.total > 0 ? `
+                  <div class="po-expand-progress">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:12px">
+                      <span style="color:var(--text3);font-weight:600">Pembayaran</span>
+                      <span style="color:var(--text2)">${pct}% terbayar · ${fmt(po.paidAmount||0)} dari ${fmt(po.total)}</span>
+                    </div>
+                    <div style="background:var(--border);border-radius:3px;height:6px;overflow:hidden">
+                      <div style="height:100%;border-radius:3px;width:${pct}%;background:${isPaid?'#22c55e':isOverdue?'#f87171':'var(--accent)'}"></div>
+                    </div>
+                  </div>` : ''}
+                  ${po.lastPayDate ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">Bayar terakhir: ${fmtDate(po.lastPayDate)}</div>` : ''}
+                </div>
+              </td>
+            </tr>`;
+
+          const mainRow = `
+            <tr class="po-row${isOverdue ? ' po-row-overdue' : ''}" style="cursor:pointer"
+              onclick="(function(){const r=document.getElementById('${expandId}');const open=r.style.display==='table-row';r.style.display=open?'none':'table-row';})()">
               <td class="po-row-publisher-cell">
                 <div class="po-row-publisher-name">
                   ${po.publisher}
@@ -917,35 +944,24 @@ export function render() {
                   ${po.bookArrived ? `<span class="po-row-arrived">✓ Stok masuk</span>` : ''}
                 </div>
               </td>
-
-              <!-- Deadline -->
-              <td class="po-row-date-cell">
-                ${fmtDate(po.dueDate)}
-              </td>
-
-              <!-- Status -->
+              <td class="po-row-date-cell">${fmtDate(po.openDate)}</td>
+              <td class="po-row-date-cell">${fmtDate(po.dueDate)}</td>
               <td>
                 <span class="po2-status-pill" style="background:${cfg.bg};color:${cfg.color};border-color:${cfg.border}">
                   <span class="po2-status-dot" style="background:${cfg.dot}"></span>
                   ${cfg.label}
                 </span>
               </td>
-
-              <!-- Total + sisa/dibayar -->
               <td class="po-row-amount-cell">
                 <div class="po-row-amount-total">${fmt(po.total)}</div>
-                ${po.paidAmount > 0 && !isPaid
-                  ? `<div class="po-row-amount-sub">Bayar: ${fmt(po.paidAmount)}</div>`
-                  : ''}
+                ${po.paidAmount > 0 && !isPaid ? `<div class="po-row-amount-sub">Bayar: ${fmt(po.paidAmount)}</div>` : ''}
               </td>
               <td class="po-row-amount-cell">
                 ${remaining > 0
                   ? `<span class="po-row-sisa">${fmt(remaining)}</span>`
                   : `<span class="po-row-lunas">Lunas</span>`}
               </td>
-
-              <!-- Aksi -->
-              <td class="po-row-actions-cell">
+              <td class="po-row-actions-cell" onclick="event.stopPropagation()">
                 ${!isPaid
                   ? `<button class="btn btn-ghost btn-sm" onclick="openQuickPayPo('${po.id}')" style="color:var(--accent);border-color:var(--accent-t)">Bayar</button>`
                   : ''}
@@ -959,7 +975,10 @@ export function render() {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 </button>
               </td>
-            </tr>`;
+            </tr>
+            ${expandRow}`;
+
+          return mainRow;
         }).join('');
 
     area.innerHTML = `
@@ -971,7 +990,6 @@ export function render() {
         <button class="btn btn-primary" onclick="openAddPreorder()">+ Buat PO</button>
       </div>
 
-      <!-- KPI Strip -->
       <div class="stat-grid">
         <div class="stat-card">
           <div class="stat-icon" style="background:#dbeafe">💳</div>
@@ -999,7 +1017,6 @@ export function render() {
         </div>
       </div>
 
-      <!-- Search + Filter -->
       <div class="search-row" style="margin-bottom:10px">
         <div style="position:relative;flex:1;min-width:180px">
           <input class="search-input" type="text" id="po-search"
@@ -1020,7 +1037,7 @@ export function render() {
           };
           return `<span class="filter-chip ${filterStatus===s?'active':''}"
             onclick="document.getElementById('po-filter-status').value='${s}';render()">
-            ${labels[s]}${counts[s]>0 ? `<span style="margin-left:4px;font-size:10px;opacity:.7">${counts[s]}</span>` : ''}
+            ${labels[s]}${counts[s]>0?`<span style="margin-left:4px;font-size:10px;opacity:.7">${counts[s]}</span>`:''}
           </span>`;
         }).join('')}
         <select id="po-filter-status" style="display:none" onchange="render()">
@@ -1032,26 +1049,35 @@ export function render() {
         </select>
       </div>
 
-      <!-- Table -->
       <div class="card" style="padding:0;overflow:hidden">
         <div class="table-wrap">
-          <table>
+          <table class="po-table">
+            <colgroup>
+              <col style="width:auto">
+              <col style="width:100px">
+              <col style="width:100px">
+              <col style="width:145px">
+              <col style="width:120px">
+              <col style="width:110px">
+              <col style="width:170px">
+            </colgroup>
             <thead>
               <tr>
                 <th>Penerbit / Buku</th>
+                <th>Tgl PO</th>
                 <th>Deadline</th>
                 <th>Status</th>
-                <th>Total PO</th>
-                <th>Sisa</th>
-                <th></th>
+                <th style="text-align:right">Total PO</th>
+                <th style="text-align:right">Sisa</th>
+                <th>Aksi</th>
               </tr>
             </thead>
             <tbody>${tableRows}</tbody>
           </table>
         </div>
-      </div>`;
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">↕ Klik baris untuk lihat detail tanggal & progress bayar</div>`;
 
-    // Sync hidden select
     const sel = document.getElementById('po-filter-status');
     if (sel) sel.value = filterStatus;
   }
