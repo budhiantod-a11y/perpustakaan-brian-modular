@@ -605,43 +605,83 @@ tbody tr:hover { background: var(--surface2); }
 
 /* ── RESPONSIVE / MOBILE ── */
 
-/* ── PREORDER TABLE ROWS ── */
-.po-row td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
-.po-row:last-child td { border-bottom: none; }
-.po-row:hover td { background: var(--bg); }
-.po-row-overdue td { background: #fff8f8; }
-.po-row-overdue:hover td { background: #fff1f2; }
 
-.po-row-publisher-cell { min-width: 220px; }
-.po-row-publisher-name {
-  font-size: 14px; font-weight: 600; color: var(--text);
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-bottom: 6px;
+/* ── COLLAPSIBLE ALERT BAR ── */
+.alert-bar-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; cursor: pointer; width: 100%;
 }
-.po-row-items { display: flex; flex-direction: column; gap: 3px; margin-bottom: 5px; }
-.po-row-item  { display: flex; align-items: baseline; gap: 8px; }
-.po-row-item-title {
-  font-size: 12px; color: var(--text2); font-weight: 500;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;
+.alert-bar-chevron {
+  font-size: 11px; transition: transform .2s; flex-shrink: 0; opacity: .7;
 }
-.po-row-item-meta { font-size: 11px; color: var(--text3); white-space: nowrap; }
-.po-row-bookmeta  { font-size: 11px; color: var(--text3); display: flex; gap: 8px; align-items: center; }
-.po-row-arrived   { color: #16a34a; font-weight: 600; }
-
-.po-row-date-cell { font-size: 12px; color: var(--text2); white-space: nowrap; vertical-align: top; padding-top: 14px; }
-
-.po-row-amount-cell { text-align: right; white-space: nowrap; vertical-align: top; padding-top: 12px; }
-.po-row-amount-total { font-size: 13px; font-weight: 700; color: var(--text); }
-.po-row-amount-sub   { font-size: 11px; color: var(--green); margin-top: 2px; }
-.po-row-sisa  { font-size: 13px; font-weight: 700; color: #e11d48; }
-.po-row-lunas { font-size: 12px; color: #16a34a; font-weight: 600; }
-
-.po-row-actions-cell {
-  white-space: nowrap; vertical-align: top; padding-top: 10px;
-  display: table-cell;
+.alert-bar-chevron.open { transform: rotate(180deg); }
+.alert-bar-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .25s ease;
 }
-.po-row-actions-cell .btn { margin-right: 4px; }
-.po-row-actions-cell .btn:last-child { margin-right: 0; }
+.alert-bar-body.open {
+  max-height: 400px;
+}
+
+/* ── MOBILE TRANSACTION CARDS ── */
+.mobile-cards { display: none; }
+.trx-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+.trx-bundle { border-color: #e9d5ff; background: #fdf4ff; }
+.trx-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
+.trx-card-title { font-weight: 600; font-size: 13px; flex: 1; }
+.trx-card-date { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.trx-card-detail { font-size: 11px; color: #7c3aed; margin-bottom: 6px; line-height: 1.4; }
+.trx-card-bottom { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.trx-card-price { font-weight: 700; }
+.trx-card-profit { color: var(--green); font-weight: 600; }
+.hide-mobile { display: block; }
+.show-mobile { display: none; }
+
+/* ── PROFIT BAR ── */
+.profit-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; }
+.profit-bar-fill { height: 6px; background: var(--accent); border-radius: 3px; transition: width .5s ease; }
+
+/* ── OVERRIDE REPORT TABLE ── */
+.override-section {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+/* ── STRIKETHROUGH ── */
+.strike { text-decoration: line-through; color: var(--text3); font-size: 11px; }
+
+/* ── BUNDLE ── */
+.bundle-row { background: #fdf4ff; }
+.bundle-row:hover { background: #fae8ff !important; }
+.bundle-detail-row { background: #faf5ff; }
+.bundle-detail-row td:first-child { padding-left: 28px; }
+.bundle-badge { background: #f3e8ff; color: #7c3aed; border: 1px solid #e9d5ff; }
+.bundle-item-row {
+  display: flex; gap: 10px; align-items: center;
+  padding: 8px 12px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: var(--radius-s);
+  margin-bottom: 6px; font-size: 13px;
+}
+.bundle-summary-bar {
+  background: linear-gradient(to right, #fdf4ff, #ede9fe);
+  border: 1px solid #e9d5ff;
+  border-radius: var(--radius-s);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+}
+
+/* ── RESPONSIVE / MOBILE ── */
 
 /* ── PREORDER EXPAND ROW ── */
 .po-table th { text-align: left; }
@@ -668,25 +708,143 @@ tbody tr:hover { background: var(--surface2); }
 .po-expand-progress { max-width: 400px; }
 
 
+/* ── PREORDER TABLE ── */
+.po-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.po-table thead th {
+  padding: 10px 14px; font-size: 11px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .5px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  white-space: nowrap; text-align: left;
+}
+.po-th-right { text-align: right !important; }
+
+/* Main row */
+.po-main-row td {
+  padding: 13px 14px; border-bottom: 1px solid var(--border);
+  vertical-align: middle; cursor: pointer;
+}
+.po-main-row:last-of-type td { border-bottom: none; }
+.po-main-row:hover td { background: var(--bg); }
+.po-main-row-overdue td { background: #fff9f9; }
+.po-main-row-overdue:hover td { background: #fff1f2; }
+
+/* Col 1: Publisher + items + meta — typographic hierarchy */
+.po-col-publisher { vertical-align: top !important; padding-top: 14px !important; }
+.po-pub-row {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.po-pub-name {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  white-space: nowrap;
+}
+/* Tier 2: item list */
+.po-items-block { margin-bottom: 5px; }
+.po-item-line {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 2px;
+}
+.po-item-line-title {
+  font-size: 12px; font-weight: 500; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 260px;
+}
+.po-item-line-meta { font-size: 11px; color: var(--text3); white-space: nowrap; flex-shrink: 0; }
+/* Tier 3: meta */
+.po-meta-line { font-size: 11px; color: var(--text3); }
+
+/* Col 2: Date */
+.po-col-date { vertical-align: middle; white-space: nowrap; }
+.po-date-main { font-size: 12px; font-weight: 600; color: var(--text2); }
+
+/* Col 3: Status */
+.po-col-status { vertical-align: middle; }
+.po-status-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; padding: 3px 9px;
+  border-radius: 20px; white-space: nowrap;
+}
+
+/* Col 4 & 5: Amounts */
+.po-col-amount { text-align: right; vertical-align: middle; white-space: nowrap; }
+.po-amount-total { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
+.po-amount-sub   { font-size: 11px; color: var(--green); display: block; margin-top: 1px; }
+.po-amount-sisa  { font-size: 13px; font-weight: 700; color: #e11d48; }
+.po-amount-lunas { font-size: 12px; color: #16a34a; font-weight: 600; }
+
+/* Col 6: Actions */
+.po-col-actions {
+  vertical-align: middle; white-space: nowrap;
+  padding-right: 12px !important;
+}
+.po-col-actions .btn { margin-right: 3px; }
+.po-col-actions .btn:last-child { margin-right: 0; }
+
+/* Detail/expand row */
+.po-detail-row td { padding: 0; border-bottom: 1px solid var(--border); }
+.po-detail-cell { padding: 0 !important; }
+.po-detail-inner {
+  padding: 16px 20px 18px 34px;
+  background: var(--bg);
+  border-top: 1px dashed var(--border2);
+}
+.po-detail-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+}
+.po-detail-section-label {
+  font-size: 10px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 8px;
+}
+.po-detail-date-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 5px;
+}
+.po-detail-date-label {
+  font-size: 11px; color: var(--text3); font-weight: 500;
+  width: 120px; flex-shrink: 0;
+}
+.po-detail-date-val { font-size: 12px; font-weight: 600; color: var(--text2); }
+.po-detail-progress-bar-wrap {
+  background: var(--border); border-radius: 4px; height: 7px;
+  overflow: hidden; margin-bottom: 7px; max-width: 340px;
+}
+.po-detail-progress-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.po-detail-progress-stats {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; margin-bottom: 5px; max-width: 340px;
+}
+.po-detail-progress-pct   { color: var(--text3); font-weight: 600; }
+.po-detail-progress-amount{ color: var(--text2); }
+.po-detail-lastpay  { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.po-detail-arrived  { font-size: 11px; color: #16a34a; font-weight: 600; margin-top: 5px; }
+
+/* Mobile: collapse to cards */
 @media (max-width: 768px) {
-  /* Mobile: table → stacked cards */
-  .po-row-publisher-cell { min-width: unset; }
-  .po-row-item-title { max-width: 160px; }
-  table thead { display: none; }
-  .po-row, .po-row td {
-    display: block;
-    border: none;
-  }
-  .po-row {
+  .po-table colgroup, .po-table thead { display: none; }
+  .po-table, .po-table tbody, .po-main-row, .po-main-row td { display: block; }
+  .po-main-row {
     border: 1px solid var(--border);
     border-radius: var(--radius-s);
     margin-bottom: 10px;
     background: var(--surface);
+    overflow: hidden;
   }
-  .po-row td { padding: 8px 12px; }
-  .po-row-date-cell::before   { content: "Deadline: "; font-weight: 600; color: var(--text3); font-size: 11px; }
-  .po-row-amount-cell { text-align: left; }
-  .po-row-actions-cell { padding-bottom: 12px; }
+  .po-main-row td { padding: 8px 12px; border: none; cursor: default; }
+  .po-col-date::before   { content: "Payment Deadline: "; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; }
+  .po-col-amount { text-align: left; }
+  .po-th-right { text-align: left !important; }
+  .po-detail-grid { grid-template-columns: 1fr; gap: 16px; }
+  .po-detail-inner { padding: 12px 14px; }
+  .po-item-line-title { max-width: 180px; }
+}
+
+
+@media (max-width: 768px) {
+  /* Mobile: table → stacked cards */
+
 }
 
 
