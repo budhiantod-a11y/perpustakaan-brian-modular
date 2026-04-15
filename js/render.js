@@ -982,12 +982,12 @@ export function render() {
                 </span>
               </td>
 
-              <td class="po-col-number">
+              <td class="po-col-total">
                 <span class="po-amount-total">${fmt(po.total)}</span>
                 ${po.paidAmount > 0 && !isPaid ? `<span class="po-amount-sub">Dibayar: ${fmt(po.paidAmount)}</span>` : ''}
               </td>
 
-              <td class="po-col-number">
+              <td class="po-col-sisa">
                 ${remaining > 0
                   ? `<span class="po-amount-sisa">${fmt(remaining)}</span>`
                   : `<span class="po-amount-lunas">—</span>`}
@@ -1083,12 +1083,12 @@ export function render() {
         <div class="table-wrap">
           <table class="po-table">
             <colgroup>
-              <col>
-              <col style="width:120px">
-              <col style="width:120px">
-              <col style="width:100px">
-              <col style="width:110px">
-              <col style="width:60px">
+              <col style="width:40%">
+              <col style="width:13%">
+              <col style="width:13%">
+              <col style="width:10%">
+              <col style="width:14%">
+              <col style="width:10%">
             </colgroup>
             <thead>
               <tr>
