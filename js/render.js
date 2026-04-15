@@ -656,7 +656,6 @@ export function render() {
               }).join('')}
             </tbody>
           </table>
-        </div>
       </div>`}`;
   }
 
@@ -688,7 +687,6 @@ export function render() {
                 </tr>`).join('')}
             </tbody>
           </table>
-        </div>
       </div>`}`;
   }
 
@@ -765,7 +763,6 @@ export function render() {
               </tr>`).join('')}
             </tbody>
           </table>
-        </div>
       </div>` : ''}
 
       ${overrides.length ? `
@@ -791,7 +788,6 @@ export function render() {
               }).join('')}
             </tbody>
           </table>
-        </div>
       </div>` : ''}
 
       <div class="card">
@@ -835,7 +831,6 @@ export function render() {
                 </tr>`).join('')}
             </tbody>
           </table>
-        </div>
       </div>` : ''}`;
   }
 
@@ -1080,7 +1075,6 @@ export function render() {
       </div>
 
       <div class="card" style="padding:0;overflow:hidden">
-        <div class="table-wrap">
           <table class="po-table">
             <colgroup>
               <col style="width:40%">
@@ -1102,7 +1096,6 @@ export function render() {
             </thead>
             <tbody>${tableRows}</tbody>
           </table>
-        </div>
       </div>`;
 
     const sel = document.getElementById('po-filter-status');
@@ -1286,7 +1279,6 @@ export function render() {
               </tr>
             </tfoot>` : ''}
           </table>
-        </div>
       </div>
 
       <p style="font-size:11px;color:var(--text3);margin-top:12px;line-height:1.6">
