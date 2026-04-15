@@ -1078,68 +1078,189 @@ export function render() {
   }
 
   // ── CASHFLOW ───────────────────────────────────────────────────────────────
-  if (S.currentTab === 'cashflow') {
+ if (S.currentTab === 'cashflow') {
+    // Import helpers from cashflow module (available via window bridge)
+    const ledger  = window._cfBuildLedger  ? window._cfBuildLedger(S.period.from, S.period.to)  : [];
+    const summary = window._cfCalcSummary  ? window._cfCalcSummary(ledger) : { totalCashIn:0, totalCashOut:0, netCashflow:0, dpPending:0 };
+
+    const filterType = document.getElementById('cf-filter-type')?.value || 'all';
+    const filterCat  = document.getElementById('cf-filter-cat')?.value  || 'all';
+    const searchQ    = (document.getElementById('cf-search')?.value || '').toLowerCase().trim();
+
+    const displayLedger = ledger.filter(e => {
+      const matchType   = filterType === 'all' || e.type === filterType;
+      const matchCat    = filterCat  === 'all' || e.category === filterCat;
+      const matchSearch = !searchQ   || e.note.toLowerCase().includes(searchQ) || (window._cfCategoryLabels?.[e.category]||'').toLowerCase().includes(searchQ);
+      return matchType && matchCat && matchSearch;
+    });
+
     const fmtDate = d => { if (!d) return '—'; const [y,m,day]=d.split('-'); return `${day}/${m}/${y}`; };
-    const pos = (S.preorders||[]).map(po=>({ ...po, status: getPoStatus(po), total: getPoTotal(po) }));
-    const filterStatus = document.getElementById('cf-filter-status')?.value || 'all';
-    const searchQ = (document.getElementById('cf-search')?.value || '').toLowerCase();
-    const filtered = pos.filter(po => {
-      const matchStatus = filterStatus==='all' || po.status===filterStatus;
-      const matchSearch = !searchQ || po.publisher.toLowerCase().includes(searchQ);
-      return matchStatus && matchSearch;
-    });
-    filtered.sort((a,b) => {
-      const order={overdue:0,unpaid:1,partial:2,paid:3};
-      if (order[a.status]!==order[b.status]) return order[a.status]-order[b.status];
-      return (a.dueDate||a.openDate||'').localeCompare(b.dueDate||b.openDate||'');
-    });
-    const totalOutstanding = pos.filter(p=>p.status!=='paid').reduce((s,p)=>s+(p.total-(p.paidAmount||0)),0);
-    const totalLunas  = pos.filter(p=>p.status==='paid').reduce((s,p)=>s+p.total,0);
-    const totalOverdue= pos.filter(p=>p.status==='overdue').length;
-    const rows = filtered.length===0
-      ? `<tr><td colspan="7" class="inv-empty">Tidak ada data cashflow</td></tr>`
-      : filtered.map(po => {
-          const {label,cls} = getStatusLabel(po.status);
-          const remaining = po.total-(po.paidAmount||0);
-          const isOverdue = po.status==='overdue';
-          const bookCount = (po.items||[]).reduce((s,i)=>s+i.qty,0);
-          return `<tr class="${isOverdue?'inv-row-overdue':''}">
-            <td>${fmtDate(po.openDate)}</td>
-            <td><span class="inv-supplier">${po.publisher}</span><span class="inv-number">${bookCount} buku · ${(po.items||[]).length} judul</span></td>
-            <td class="inv-due ${isOverdue?'inv-due-late':''}">${fmtDate(po.dueDate)}</td>
-            <td class="inv-amount">${fmt(po.total)}</td>
-            <td class="inv-amount">${po.paidAmount?fmt(po.paidAmount):'—'}</td>
-            <td class="inv-amount ${remaining>0?'inv-remaining':''}">${remaining>0?fmt(remaining):'—'}</td>
-            <td><span class="inv-status ${cls}">${label}</span></td>
+
+    const catLabel = c => window._cfCategoryLabels?.[c] || c;
+
+    const categoryBadgeStyle = (cat, type) => {
+      const styles = {
+        penjualan:   'background:#dcfce7;color:#16a34a',
+        dp_customer: 'background:#faf5ff;color:#7c3aed',
+        bayar_po:    'background:#fee2e2;color:#dc2626',
+        ongkir:      'background:#fff7ed;color:#c2410c',
+        operasional: 'background:#f0f9ff;color:#0369a1',
+        lainnya:     'background:#f5f5f4;color:#57534e',
+      };
+      return styles[cat] || (type==='income' ? 'background:#dcfce7;color:#16a34a' : 'background:#fee2e2;color:#dc2626');
+    };
+
+    const rows = displayLedger.length === 0
+      ? `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text3);font-size:13px">
+          ${ledger.length === 0 ? 'Belum ada data cashflow di periode ini' : 'Tidak ada entri yang cocok dengan filter'}
+         </td></tr>`
+      : displayLedger.map(e => {
+          const isPending  = e.isAdvance && !e.delivered;
+          const isAuto     = e.source === 'auto';
+          const isIncome   = e.type   === 'income';
+
+          return `<tr style="${isPending ? 'opacity:.75;font-style:italic' : ''}">
+            <td style="color:var(--text3);white-space:nowrap;font-size:12px">${fmtDate(e.date)}</td>
+            <td>
+              <div style="font-size:13px;font-weight:${isAuto?'500':'600'}">${e.note}</div>
+              ${isPending ? `<div style="font-size:11px;color:#7c3aed;margin-top:2px">⏳ Buku belum dikirim</div>` : ''}
+            </td>
+            <td>
+              <span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;${categoryBadgeStyle(e.category, e.type)}">
+                ${catLabel(e.category)}
+              </span>
+              ${isAuto ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">auto</span>` : ''}
+            </td>
+            <td style="text-align:right;font-weight:600;color:var(--green)">
+              ${isIncome ? fmt(e.amount) : '—'}
+            </td>
+            <td style="text-align:right;font-weight:600;color:var(--red)">
+              ${!isIncome ? fmt(e.amount) : '—'}
+            </td>
+            <td style="text-align:right">
+              ${isAuto ? '' : `
+                <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
+                  ${isPending ? `
+                    <button class="btn btn-ghost btn-xs" onclick="cfMarkDelivered('${e.id}')" title="Tandai sudah dikirim" style="color:var(--green);border-color:var(--green);font-size:10px;padding:3px 7px">
+                      ✓ Delivered
+                    </button>` : ''}
+                  <button class="btn btn-ghost btn-xs" onclick="openEditCashflow('${e.id}')" title="Edit">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  </button>
+                  <button class="btn btn-ghost btn-xs" onclick="deleteCashflow('${e.id}')" title="Hapus" style="color:var(--red);border-color:var(--red-s)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </div>`}
+            </td>
           </tr>`;
         }).join('');
+
     area.innerHTML = `
       <div class="page-hdr">
-        <div><div class="page-title">Cashflow</div><div class="page-sub">Ringkasan outstanding PO ke penerbit</div></div>
+        <div>
+          <div class="page-title">Cashflow</div>
+          <div class="page-sub">Ledger pemasukan &amp; pengeluaran toko</div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddCashflow()">+ Tambah Entri</button>
       </div>
+
+      <div class="period-bar" style="margin-bottom:16px">
+        <label>Periode</label>
+        <input type="date" value="${S.period.from}" onchange="setPeriodFrom(this.value)">
+        <span class="period-sep">—</span>
+        <input type="date" value="${S.period.to}" onchange="setPeriodTo(this.value)">
+      </div>
+
+      <!-- Summary strip -->
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">💳</div><div class="stat-label">Total Outstanding</div><div class="stat-value" style="color:var(--blue)">${fmt(totalOutstanding)}</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⚠️</div><div class="stat-label">Terlambat</div><div class="stat-value" style="color:var(--red)">${totalOverdue} PO</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#dcfce7">✅</div><div class="stat-label">Total Sudah Dibayar</div><div class="stat-value" style="color:var(--green)">${fmt(totalLunas)}</div></div>
-        <div class="stat-card"><div class="stat-icon" style="background:#f5f5f4">📋</div><div class="stat-label">Total PO</div><div class="stat-value">${pos.length} PO</div></div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#dcfce7">💰</div>
+          <div class="stat-label">Total Cash In</div>
+          <div class="stat-value" style="color:var(--green)">${fmt(summary.totalCashIn)}</div>
+          <div class="stat-sub">Termasuk DP pending</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#fee2e2">💸</div>
+          <div class="stat-label">Total Cash Out</div>
+          <div class="stat-value" style="color:var(--red)">${fmt(summary.totalCashOut)}</div>
+          <div class="stat-sub">Semua pengeluaran</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#ede9fe">📊</div>
+          <div class="stat-label">Net Cashflow</div>
+          <div class="stat-value" style="color:${summary.netCashflow>=0?'var(--accent)':'var(--red)'}">${fmt(summary.netCashflow)}</div>
+          <div class="stat-sub">Diluar DP pending</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#faf5ff">⏳</div>
+          <div class="stat-label">DP Pending</div>
+          <div class="stat-value" style="color:#7c3aed">${fmt(summary.dpPending)}</div>
+          <div class="stat-sub">Buku belum dikirim</div>
+        </div>
       </div>
-      <div class="inv-filters">
-        <input type="text" id="cf-search" class="search-input" placeholder="Cari penerbit..." oninput="render()" value="${searchQ}" style="background-position:10px center">
-        <select id="cf-filter-status" class="inv-filter-select" onchange="render()">
-          <option value="all"     ${filterStatus==='all'    ?'selected':''}>Semua Status</option>
-          <option value="overdue" ${filterStatus==='overdue'?'selected':''}>Terlambat</option>
-          <option value="unpaid"  ${filterStatus==='unpaid' ?'selected':''}>Belum Bayar</option>
-          <option value="partial" ${filterStatus==='partial'?'selected':''}>Bayar Sebagian</option>
-          <option value="paid"    ${filterStatus==='paid'   ?'selected':''}>Lunas</option>
+
+      ${summary.dpPending > 0 ? `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:var(--radius-s);margin-bottom:16px;font-size:12px;color:#7c3aed">
+        <span style="font-size:16px">⚠</span>
+        <span><strong>${fmt(summary.dpPending)}</strong> uang muka belum dipenuhi — tandai sebagai Delivered setelah buku dikirim</span>
+      </div>` : ''}
+
+      <!-- Filters -->
+      <div class="search-row" style="margin-bottom:12px">
+        <div style="position:relative;flex:1;min-width:180px">
+          <input class="search-input" type="text" id="cf-search"
+            placeholder="Cari keterangan, kategori..."
+            oninput="render()" value="${searchQ}"
+            style="width:100%">
+        </div>
+        <select class="inp" id="cf-filter-type" onchange="render()" style="max-width:140px;font-size:13px">
+          <option value="all"     ${filterType==='all'    ?'selected':''}>Semua Tipe</option>
+          <option value="income"  ${filterType==='income' ?'selected':''}>Pemasukan</option>
+          <option value="expense" ${filterType==='expense'?'selected':''}>Pengeluaran</option>
+        </select>
+        <select class="inp" id="cf-filter-cat" onchange="render()" style="max-width:160px;font-size:13px">
+          <option value="all"         ${filterCat==='all'        ?'selected':''}>Semua Kategori</option>
+          <option value="penjualan"   ${filterCat==='penjualan'  ?'selected':''}>Penjualan</option>
+          <option value="dp_customer" ${filterCat==='dp_customer'?'selected':''}>DP / Uang Muka</option>
+          <option value="bayar_po"    ${filterCat==='bayar_po'   ?'selected':''}>Bayar PO</option>
+          <option value="ongkir"      ${filterCat==='ongkir'     ?'selected':''}>Ongkir</option>
+          <option value="operasional" ${filterCat==='operasional'?'selected':''}>Operasional</option>
+          <option value="lainnya"     ${filterCat==='lainnya'    ?'selected':''}>Lainnya</option>
         </select>
       </div>
-      <div class="table-wrap">
-        <table class="inv-table">
-          <thead><tr><th>Tgl PO</th><th>Penerbit</th><th>Deadline Bayar</th><th>Total</th><th>Dibayar</th><th>Sisa</th><th>Status</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
+
+      <!-- Ledger table -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Keterangan</th>
+                <th>Kategori</th>
+                <th style="text-align:right">Masuk</th>
+                <th style="text-align:right">Keluar</th>
+                <th style="text-align:right"></th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            ${displayLedger.length > 0 ? `
+            <tfoot>
+              <tr style="background:var(--surface);font-weight:700;font-size:13px">
+                <td colspan="3" style="padding:10px 12px;color:var(--text2)">Total periode ini</td>
+                <td style="text-align:right;padding:10px 12px;color:var(--green)">${fmt(displayLedger.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0))}</td>
+                <td style="text-align:right;padding:10px 12px;color:var(--red)">${fmt(displayLedger.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0))}</td>
+                <td></td>
+              </tr>
+            </tfoot>` : ''}
+          </table>
+        </div>
       </div>
-      <p class="cf-note">* Data Cashflow otomatis dari tab Preorder. Untuk mencatat pembayaran, gunakan tombol Bayar di tab Preorder.</p>`;
+
+      <p style="font-size:11px;color:var(--text3);margin-top:12px;line-height:1.6">
+        * Pemasukan dari penjualan dicatat saat transaksi diproses, bukan saat dana Shopee cair.<br>
+        * Entri <span style="font-size:10px;color:var(--text3)">auto</span> tidak bisa diedit — ubah langsung di tab Penjualan atau Preorder.
+      </p>`;
   }
 
   // Reset scanner flag after each render
