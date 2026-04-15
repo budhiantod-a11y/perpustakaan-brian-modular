@@ -527,6 +527,25 @@ tbody tr:hover { background: var(--surface2); }
   font-size: 11px; white-space: nowrap;
 }
 
+
+/* ── COLLAPSIBLE ALERT BAR ── */
+.alert-bar-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; cursor: pointer; width: 100%;
+}
+.alert-bar-chevron {
+  font-size: 11px; transition: transform .2s; flex-shrink: 0; opacity: .7;
+}
+.alert-bar-chevron.open { transform: rotate(180deg); }
+.alert-bar-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height .25s ease;
+}
+.alert-bar-body.open {
+  max-height: 400px;
+}
+
 /* ── MOBILE TRANSACTION CARDS ── */
 .mobile-cards { display: none; }
 .trx-card {
@@ -724,27 +743,18 @@ tbody tr:hover { background: var(--surface2); }
 
 /* Create button — primary CTA */
 .po2-btn-create {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 20px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-  box-shadow: 0 2px 8px rgba(79,70,229,.25);
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent); color: #fff;
+  border: 1px solid var(--accent); border-radius: var(--radius-s);
+  padding: 8px 16px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
 }
-.po2-btn-create:hover { background: #4338ca; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(79,70,229,.3); }
+.po2-btn-create:hover { background: #4338ca; }
 
 /* KPI Strip */
 .po2-kpi-strip {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -857,7 +867,7 @@ tbody tr:hover { background: var(--surface2); }
   transition: box-shadow .2s, transform .2s;
   display: flex; flex-direction: column;
 }
-.po2-card:hover { box-shadow: var(--shadow-m); transform: translateY(-2px); }
+.po2-card:hover { box-shadow: var(--shadow-m); }
 .po2-card-overdue {
   border-color: #fecdd3;
   box-shadow: 0 0 0 1px #fecdd3, var(--shadow);
@@ -878,7 +888,7 @@ tbody tr:hover { background: var(--surface2); }
   margin-bottom: 6px;
 }
 .po2-publisher {
-  font-size: 15px; font-weight: 800;
+  font-size: 15px; font-weight: 600;
   color: var(--text); letter-spacing: -.2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -984,9 +994,9 @@ tbody tr:hover { background: var(--surface2); }
 }
 .po2-payment-info { display: flex; flex-direction: column; gap: 2px; }
 .po2-payment-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .4px; }
-.po2-payment-total    { font-size: 15px; font-weight: 800; color: var(--text); }
+.po2-payment-total    { font-size: 15px; font-weight: 700; color: var(--text); }
 .po2-payment-paid     { font-size: 14px; font-weight: 700; color: #16a34a; }
-.po2-payment-remaining{ font-size: 14px; font-weight: 800; color: #e11d48; }
+.po2-payment-remaining{ font-size: 14px; font-weight: 700; color: #e11d48; }
 
 /* Progress bar */
 .po2-progress-wrap {
@@ -1016,15 +1026,13 @@ tbody tr:hover { background: var(--surface2); }
   transition: all .15s;
 }
 .po2-btn-pay {
-  background: var(--accent); color: #fff;
-  box-shadow: 0 2px 6px rgba(79,70,229,.2);
+  background: var(--surface); color: var(--accent); border: 1px solid var(--accent-t);
 }
-.po2-btn-pay:hover { background: #4338ca; transform: translateY(-1px); }
+.po2-btn-pay:hover { background: var(--accent-s); border-color: var(--accent); }
 .po2-btn-arrive {
-  background: #22c55e; color: #fff;
-  box-shadow: 0 2px 6px rgba(34,197,94,.2);
+  background: var(--surface); color: #16a34a; border: 1px solid #bbf7d0;
 }
-.po2-btn-arrive:hover { background: #16a34a; }
+.po2-btn-arrive:hover { background: #f0fdf4; border-color: #16a34a; }
 
 /* Icon-only buttons */
 .po2-btn-icon {
