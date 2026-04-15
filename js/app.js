@@ -27,6 +27,9 @@ Sync.init(render);
 Preorder.init(render);
 Cashflow.init(render);
 
+// ── Expose S to window for debug/migration access ──
+window._S = S;
+
 // ── Expose cashflow helpers to render.js via window (render.js uses window._cf*) ──
 window._cfBuildLedger         = Cashflow.buildLedger;
 window._cfCalcSummary         = Cashflow.calcSummary;
@@ -229,7 +232,26 @@ Object.assign(window, {
 // ═══════════════════════════════════════════════════════════════════════════
 // Boot — Phase 2: Sheets-first with localStorage fallback
 // ═══════════════════════════════════════════════════════════════════════════
+// ── Migration: fix Boolean('FALSE') bug from old data ────────────────────────
+function migrateData() {
+  let dirty = false;
+  S.cashflows.forEach(cf => {
+    if (typeof cf.isAdvance === 'string') { cf.isAdvance = cf.isAdvance === 'TRUE' || cf.isAdvance === 'true'; dirty = true; }
+    if (typeof cf.delivered === 'string') { cf.delivered = cf.delivered === 'TRUE' || cf.delivered === 'true'; dirty = true; }
+  });
+  S.preorders.forEach(po => {
+    if (typeof po.bookArrived === 'string') { po.bookArrived = po.bookArrived === 'TRUE' || po.bookArrived === 'true'; dirty = true; }
+  });
+  if (dirty) {
+    try { localStorage.setItem('perpbrian_v1', JSON.stringify({ books: S.books, sales: S.sales, restocks: S.restocks, preorders: S.preorders, cashflows: S.cashflows, period: S.period })); }
+    catch(e) {}
+    S.syncToSheets(); // push fixed data back to Sheets
+    console.log('[migrate] Fixed corrupt boolean data + synced to Sheets');
+  }
+}
+
 S.load();
+migrateData();
 Scanner.setupKeyboardScanner();
 render();
 
@@ -240,6 +262,7 @@ if (S.gsUrl) {
 
   S.fetchFromSheetsOnBoot().then(result => {
     if (result.ok) {
+      migrateData(); // fix any corrupt booleans from Sheets
       render();
       S.updateSyncUI('connected');
       if (banner) { banner.className = 'sync-banner synced'; banner.innerHTML = '✓ Data dari Google Sheets berhasil dimuat'; setTimeout(() => banner.style.display = 'none', 3000); }
