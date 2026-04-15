@@ -251,7 +251,6 @@ function migrateData() {
 }
 
 S.load();
-migrateData();
 Scanner.setupKeyboardScanner();
 render();
 
@@ -262,7 +261,8 @@ if (S.gsUrl) {
 
   S.fetchFromSheetsOnBoot().then(result => {
     if (result.ok) {
-      migrateData(); // fix any corrupt booleans from Sheets
+      migrateData(); // fix corrupt booleans from Sheets
+      S.syncToSheets();  // push fixed data back so Sheets has correct TRUE/FALSE
       render();
       S.updateSyncUI('connected');
       if (banner) { banner.className = 'sync-banner synced'; banner.innerHTML = '✓ Data dari Google Sheets berhasil dimuat'; setTimeout(() => banner.style.display = 'none', 3000); }
