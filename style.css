@@ -685,8 +685,6 @@ tbody tr:hover { background: var(--surface2); }
 
 /* ── PREORDER EXPAND ROW ── */
 .po-table th { text-align: left; }
-.po-table th:nth-child(5),
-.po-table th:nth-child(6) { text-align: right; }
 
 .po-expand-row td { padding: 0; }
 .po-expand-cell { padding: 0 !important; }
@@ -716,7 +714,6 @@ tbody tr:hover { background: var(--surface2); }
   background: var(--bg); border-bottom: 1px solid var(--border);
   white-space: nowrap; text-align: left;
 }
-.po-th-right { text-align: right !important; }
 
 /* Main row */
 .po-main-row td {
@@ -766,7 +763,7 @@ tbody tr:hover { background: var(--surface2); }
 }
 
 /* Col 4 & 5: Amounts */
-.po-col-amount { text-align: right; vertical-align: middle; white-space: nowrap; }
+.po-col-number { text-align: left; vertical-align: middle; white-space: nowrap; }
 .po-amount-total { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
 .po-amount-sub   { font-size: 11px; color: var(--green); display: block; margin-top: 1px; }
 .po-amount-sisa  { font-size: 13px; font-weight: 700; color: #e11d48; }
@@ -834,14 +831,9 @@ tbody tr:hover { background: var(--surface2); }
 .po-badge-info    { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 
 /* Actions column: primary (Bayar/Buku Datang) + secondary (Edit/Hapus) grouped */
-.po-actions-wrap {
-  display: flex; align-items: center;
-  justify-content: space-between; gap: 8px;
-}
-.po-actions-primary { display: flex; gap: 4px; }
-.po-actions-secondary {
-  display: flex; gap: 2px;
-  padding-left: 8px;
+.po-col-action-primary  { vertical-align: middle; white-space: nowrap; }
+.po-col-action-secondary {
+  vertical-align: middle; white-space: nowrap;
   border-left: 1px solid var(--border);
 }
 .po-btn-pay   { color: var(--accent) !important; border-color: var(--accent-t) !important; }
