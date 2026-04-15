@@ -840,7 +840,9 @@ tbody tr:hover { background: var(--surface2); }
 /* Mobile: collapse to cards */
 @media (max-width: 768px) {
   .po-table colgroup, .po-table thead { display: none; }
-  .po-table, .po-table tbody, .po-main-row, .po-main-row td { display: block; }
+  .po-table, .po-table tbody { display: block; }
+  .po-main-row { display: block; }
+  .po-main-row td { display: block; padding: 8px 12px; border: none; cursor: default; }
   .po-main-row {
     border: 1px solid var(--border);
     border-radius: var(--radius-s);
@@ -848,28 +850,24 @@ tbody tr:hover { background: var(--surface2); }
     background: var(--surface);
     overflow: hidden;
   }
-  .po-main-row td { padding: 8px 12px; border: none; cursor: default; }
+  /* Detail row stays as table */
+  .po-detail-row { display: table-row; }
+  .po-detail-cell { display: table-cell; }
   .po-col-total::before {
-    content: "Total PO  ";
+    content: "Total PO";
     font-size: 10px; font-weight: 700; color: var(--text3);
     text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px;
   }
   .po-col-sisa::before {
-    content: "Sisa  ";
+    content: "Sisa";
     font-size: 10px; font-weight: 700; color: var(--text3);
     text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px;
   }
   .po-col-action-primary  { display: block; }
-  .po-col-action-secondary{ display: flex; gap: 8px; padding-top: 4px; }
+  .po-col-action-secondary{ display: flex; gap: 8px; padding-top: 4px; padding-bottom: 4px; }
   .po-detail-grid { grid-template-columns: 1fr; gap: 16px; }
   .po-detail-inner { padding: 12px 14px; }
-  .po-item-line-title { max-width: 180px; }
-}
-
-
-@media (max-width: 768px) {
-  /* Mobile: table → stacked cards */
-
+  .po-item-line-title { max-width: 100%; }
 }
 
 
