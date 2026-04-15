@@ -873,18 +873,42 @@ export function render() {
       overdue: { label: 'Terlambat',      dot: '#f87171', bg: '#fff1f2', color: '#e11d48', border: '#fecdd3' },
     };
 
-    const urgBadge = (dueDate, status) => {
-      if (status === 'paid' || !dueDate) return '';
-      const days = Math.round((new Date(dueDate).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
-      if (days < 0)   return `<span class="po2-urgency po2-urgency-overdue">Lewat ${Math.abs(days)}h</span>`;
-      if (days === 0) return `<span class="po2-urgency po2-urgency-today">Hari ini!</span>`;
-      if (days <= 3)  return `<span class="po2-urgency po2-urgency-soon">${days}h lagi</span>`;
-      if (days <= 7)  return `<span class="po2-urgency po2-urgency-week">${days}h lagi</span>`;
-      return '';
+    // Dynamic badge: highlight Close PO dan Payment Deadline saja
+    // Returns array of badges (max 2) — only show upcoming/urgent ones
+    const dynamicBadges = (po) => {
+      if (po.status === 'paid') return '';
+      const now = new Date(); now.setHours(0,0,0,0);
+      const badges = [];
+
+      const diffDays = (dateStr) => {
+        if (!dateStr) return null;
+        const d = new Date(dateStr); d.setHours(0,0,0,0);
+        return Math.round((d - now) / 86400000);
+      };
+
+      // Close PO badge — only if not yet closed (days >= 0) and within 7 days
+      const closeDays = diffDays(po.closeDate);
+      if (closeDays !== null && closeDays >= 0 && closeDays <= 7) {
+        const label = closeDays === 0 ? 'Close PO hari ini' : `Close PO ${closeDays}h lagi`;
+        const cls = closeDays === 0 ? 'po-badge-urgent' : closeDays <= 3 ? 'po-badge-warn' : 'po-badge-info';
+        badges.push(`<span class="po-dyn-badge ${cls}">${label}</span>`);
+      }
+
+      // Payment Deadline badge
+      const dueDays = diffDays(po.dueDate);
+      if (dueDays !== null && dueDays <= 7) {
+        let label, cls;
+        if (dueDays < 0)      { label = `Deadline lewat ${Math.abs(dueDays)}h`; cls = 'po-badge-overdue'; }
+        else if (dueDays === 0){ label = 'Deadline hari ini!';                   cls = 'po-badge-urgent'; }
+        else                   { label = `Deadline ${dueDays}h lagi`;            cls = dueDays <= 3 ? 'po-badge-warn' : 'po-badge-info'; }
+        badges.push(`<span class="po-dyn-badge ${cls}">${label}</span>`);
+      }
+
+      return badges.join('');
     };
 
     const tableRows = poFiltered.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text3);font-size:13px">
+      ? `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text3);font-size:13px">
           ${searchQ ? `Tidak ada hasil untuk "${searchQ}"` : 'Belum ada preorder. Buat PO pertama.'}
          </td></tr>`
       : poFiltered.map(po => {
@@ -896,9 +920,7 @@ export function render() {
           const pct       = po.total > 0 ? Math.min(100, Math.round((po.paidAmount||0) / po.total * 100)) : 0;
           const expandId  = 'po-exp-' + po.id;
 
-          // ── Tier 1: Publisher name + urgency (primary) ──
-          // ── Tier 2: Item list (secondary) ──
-          // ── Tier 3: Book count meta (tertiary) ──
+          // Tier 2: item list
           const itemsHtml = (po.items||[]).map(item =>
             `<div class="po-item-line">
               <span class="po-item-line-title">${item.title}</span>
@@ -906,7 +928,7 @@ export function render() {
             </div>`
           ).join('');
 
-          // ── Expand detail panel ──
+          // Expand detail panel
           const dateRows = [
             ['Open PO',          po.openDate],
             ['Close PO',         po.closeDate],
@@ -916,10 +938,9 @@ export function render() {
 
           const expandRow = `
             <tr class="po-detail-row" id="${expandId}" style="display:none">
-              <td colspan="6" class="po-detail-cell">
+              <td colspan="5" class="po-detail-cell">
                 <div class="po-detail-inner">
                   <div class="po-detail-grid">
-                    <!-- Left: dates -->
                     <div class="po-detail-dates">
                       <div class="po-detail-section-label">Tanggal</div>
                       ${dateRows.map(([label, date]) => `
@@ -928,7 +949,6 @@ export function render() {
                           <span class="po-detail-date-val">${fmtDate(date)}</span>
                         </div>`).join('')}
                     </div>
-                    <!-- Right: payment progress -->
                     <div class="po-detail-payment">
                       <div class="po-detail-section-label">Pembayaran</div>
                       <div class="po-detail-progress-bar-wrap">
@@ -956,23 +976,18 @@ export function render() {
                 ch.style.transform=open?'':'rotate(90deg)';
               })()">
 
-              <!-- Col 1: Publisher / Items / Meta -->
+              <!-- Col 1: Publisher / Items / Meta + dynamic badges -->
               <td class="po-col-publisher">
                 <div class="po-pub-row">
                   <svg id="chev-${po.id}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;color:var(--text3);transition:transform .2s"><polyline points="9 18 15 12 9 6"/></svg>
                   <span class="po-pub-name">${po.publisher}</span>
-                  ${urgBadge(po.dueDate, po.status)}
+                  ${dynamicBadges(po)}
                 </div>
                 <div class="po-items-block">${itemsHtml}</div>
-                <div class="po-meta-line">${bookCount} buku &middot; ${(po.items||[]).length} judul</div>
+                <div class="po-meta-line">${bookCount} buku &middot; ${(po.items||[]).length} judul${po.bookArrived ? ' &middot; <span style="color:#16a34a;font-weight:600">✓ Stok masuk</span>' : ''}</div>
               </td>
 
-              <!-- Col 2: Payment Deadline -->
-              <td class="po-col-date">
-                <span class="po-date-main">${fmtDateShort(po.dueDate)}</span>
-              </td>
-
-              <!-- Col 3: Status -->
+              <!-- Col 2: Status -->
               <td class="po-col-status">
                 <span class="po-status-pill" style="background:${cfg.bg};color:${cfg.color};border:1px solid ${cfg.border}">
                   <span style="width:6px;height:6px;border-radius:50%;background:${cfg.dot};display:inline-block;flex-shrink:0"></span>
@@ -980,35 +995,39 @@ export function render() {
                 </span>
               </td>
 
-              <!-- Col 4: Total PO -->
+              <!-- Col 3: Total PO -->
               <td class="po-col-amount">
                 <span class="po-amount-total">${fmt(po.total)}</span>
-                ${po.paidAmount > 0 && !isPaid
-                  ? `<span class="po-amount-sub">Dibayar: ${fmt(po.paidAmount)}</span>`
-                  : ''}
+                ${po.paidAmount > 0 && !isPaid ? `<span class="po-amount-sub">Dibayar: ${fmt(po.paidAmount)}</span>` : ''}
               </td>
 
-              <!-- Col 5: Sisa -->
+              <!-- Col 4: Sisa -->
               <td class="po-col-amount">
                 ${remaining > 0
                   ? `<span class="po-amount-sisa">${fmt(remaining)}</span>`
                   : `<span class="po-amount-lunas">—</span>`}
               </td>
 
-              <!-- Col 6: Actions (stopPropagation supaya tidak trigger expand) -->
+              <!-- Col 5: Aksi (Bayar / Buku Datang) + Edit/Hapus terpisah -->
               <td class="po-col-actions" onclick="event.stopPropagation()">
-                ${!isPaid
-                  ? `<button class="btn btn-ghost btn-xs" style="color:var(--accent);border-color:var(--accent-t)" onclick="openQuickPayPo('${po.id}')">Bayar</button>`
-                  : ''}
-                ${isPaid && !po.bookArrived
-                  ? `<button class="btn btn-ghost btn-xs" style="color:#16a34a;border-color:#bbf7d0" onclick="openBukuDatang('${po.id}')">Buku Datang</button>`
-                  : ''}
-                <button class="btn btn-ghost btn-xs" title="Edit" onclick="openEditPreorder('${po.id}')">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-                <button class="btn btn-ghost btn-xs" title="Hapus" style="color:var(--red)" onclick="deletePreorder('${po.id}')">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                </button>
+                <div class="po-actions-wrap">
+                  <div class="po-actions-primary">
+                    ${!isPaid
+                      ? `<button class="btn btn-ghost btn-xs po-btn-pay" onclick="openQuickPayPo('${po.id}')">Bayar</button>`
+                      : ''}
+                    ${isPaid && !po.bookArrived
+                      ? `<button class="btn btn-ghost btn-xs po-btn-arrive" onclick="openBukuDatang('${po.id}')">Buku Datang</button>`
+                      : ''}
+                  </div>
+                  <div class="po-actions-secondary">
+                    <button class="btn btn-ghost btn-xs" title="Edit" onclick="openEditPreorder('${po.id}')">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="btn btn-ghost btn-xs" title="Hapus" style="color:var(--red)" onclick="deletePreorder('${po.id}')">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                  </div>
+                </div>
               </td>
             </tr>
             ${expandRow}`;
@@ -1086,16 +1105,14 @@ export function render() {
           <table class="po-table">
             <colgroup>
               <col><!-- Publisher/Items: flex -->
-              <col style="width:96px"><!-- Payment Deadline -->
-              <col style="width:140px"><!-- Status -->
+              <col style="width:130px"><!-- Status -->
               <col style="width:130px"><!-- Total PO -->
               <col style="width:110px"><!-- Sisa -->
-              <col style="width:168px"><!-- Aksi -->
+              <col style="width:190px"><!-- Aksi -->
             </colgroup>
             <thead>
               <tr>
                 <th>Penerbit / Buku</th>
-                <th>Payment Deadline</th>
                 <th>Status</th>
                 <th class="po-th-right">Total PO</th>
                 <th class="po-th-right">Sisa</th>
