@@ -832,10 +832,7 @@ tbody tr:hover { background: var(--surface2); }
 
 /* Actions column: primary (Bayar/Buku Datang) + secondary (Edit/Hapus) grouped */
 .po-col-action-primary  { vertical-align: middle; white-space: nowrap; }
-.po-col-action-secondary {
-  vertical-align: middle; white-space: nowrap;
-  border-left: 1px solid var(--border);
-}
+.po-col-action-secondary { vertical-align: middle; white-space: nowrap; }
 .po-btn-pay   { color: var(--accent) !important; border-color: var(--accent-t) !important; }
 .po-btn-arrive{ color: #16a34a !important; border-color: #bbf7d0 !important; }
 
