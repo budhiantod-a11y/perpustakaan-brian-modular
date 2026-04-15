@@ -245,8 +245,10 @@ export function saveQuickPayPo(id) {
   const total  = getPoTotal(po);
   const nowPay = Number(document.getElementById('qpay-amount')?.value) || 0;
   if (nowPay <= 0) return showToast('Jumlah harus lebih dari 0', 'error');
+  const payDate = document.getElementById('qpay-date')?.value || today();
   const newPaid = Math.min((po.paidAmount || 0) + nowPay, total);
-  S.preorders[idx] = { ...po, paidAmount: newPaid };
+  const newLog  = [...(po.paymentLog || []), { amount: nowPay, date: payDate }];
+  S.preorders[idx] = { ...po, paidAmount: newPaid, lastPayDate: payDate, paymentLog: newLog };
   S.save(); closeModal();
   showToast(getPoStatus(S.preorders[idx]) === 'paid' ? 'PO lunas! ✓' : 'Pembayaran dicatat ✓');
   _render();
