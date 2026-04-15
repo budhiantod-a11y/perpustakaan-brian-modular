@@ -350,7 +350,7 @@ export function saveNewBookFromPo(poId, newBooksNeeded, currentIdx, barcodes, al
   const item = newBooksNeeded[currentIdx].item;
   const newBook = { id: uid(), barcode, title, author, publisher, category, normalPrice, sellPrice: normalPrice, batches: [] };
   S.books.push(newBook);
-  addRestockBatch(newBook.id, title, item.qty, item.pricePerPcs, po?.openDate || today());
+  addRestockBatch(newBook.id, title, item.qty, item.pricePerPcs, today());
   alreadyRestocked.push(barcode);
   S.save(); showToast('"' + title + '" ditambahkan ✓');
   openNewBookFromPo(poId, newBooksNeeded, currentIdx + 1, barcodes, alreadyRestocked);
@@ -366,7 +366,7 @@ function processRestockAll(poId, barcodes, alreadyRestocked) {
     const barcode = barcodes[idx];
     if (alreadyRestocked.includes(barcode)) return; // skip — sudah di-restock via saveNewBookFromPo
     const book = S.books.find(b => b.barcode === barcode);
-    if (book) addRestockBatch(book.id, book.title, item.qty, item.pricePerPcs, po.openDate || today());
+    if (book) addRestockBatch(book.id, book.title, item.qty, item.pricePerPcs, today());
   });
   S.preorders[poIdx] = { ...po, bookArrived: true };
   S.save(); closeModal(); showToast('Semua buku berhasil di-restock! ✓'); _render();
