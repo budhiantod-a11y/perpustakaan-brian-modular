@@ -1084,11 +1084,11 @@ export function render() {
           <table class="po-table">
             <colgroup>
               <col>
-              <col style="width:130px">
-              <col style="width:130px">
-              <col style="width:110px">
               <col style="width:120px">
-              <col style="width:64px">
+              <col style="width:120px">
+              <col style="width:100px">
+              <col style="width:110px">
+              <col style="width:60px">
             </colgroup>
             <thead>
               <tr>
