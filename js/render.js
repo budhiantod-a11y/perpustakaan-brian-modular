@@ -1106,7 +1106,8 @@ export function render() {
   if (S.currentTab === 'cashflow') {
     // Import helpers from cashflow module (available via window bridge)
     const ledger  = window._cfBuildLedger  ? window._cfBuildLedger(S.period.from, S.period.to)  : [];
-    const summary = window._cfCalcSummary  ? window._cfCalcSummary(ledger) : { totalCashIn:0, totalCashOut:0, netCashflow:0, dpPending:0 };
+    const summary    = window._cfCalcSummary       ? window._cfCalcSummary(ledger)       : { totalCashIn:0, totalCashOut:0, netCashflow:0, dpPending:0 };
+    const allTimeDp  = window._cfAllTimePendingDp  ? window._cfAllTimePendingDp()        : { total:0, count:0 };
 
     const filterType = document.getElementById('cf-filter-type')?.value || 'all';
     const filterCat  = document.getElementById('cf-filter-cat')?.value  || 'all';
@@ -1220,14 +1221,17 @@ export function render() {
           <div class="stat-icon" style="background:#faf5ff">⏳</div>
           <div class="stat-label">DP Pending</div>
           <div class="stat-value" style="color:#7c3aed">${fmt(summary.dpPending)}</div>
-          <div class="stat-sub">Buku belum dikirim</div>
+          <div class="stat-sub">Periode ini</div>
         </div>
       </div>
 
-      ${summary.dpPending > 0 ? `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:var(--radius-s);margin-bottom:16px;font-size:12px;color:#7c3aed">
-        <span style="font-size:16px">⚠</span>
-        <span><strong>${fmt(summary.dpPending)}</strong> uang muka belum dipenuhi — tandai sebagai Delivered setelah buku dikirim</span>
+      ${allTimeDp.total > 0 ? `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:var(--radius-s);margin-bottom:16px;font-size:12px;color:#7c3aed;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span>⚠</span>
+          <span><strong>DP Pending (semua waktu):</strong> ${fmt(allTimeDp.total)} · ${allTimeDp.count} entri belum delivered</span>
+        </div>
+        <span style="font-size:11px;color:var(--text3)">Filter "DP / Uang Muka" untuk lihat detail</span>
       </div>` : ''}
 
       <!-- Filters -->

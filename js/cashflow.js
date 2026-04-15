@@ -117,6 +117,17 @@ export function calcSummary(ledger) {
   return { totalCashIn, totalCashOut, netCashflow, dpPending };
 }
 
+// ─── All-time DP Pending (tidak terikat periode) ───────────────────────────────
+
+export function calcAllTimePendingDp() {
+  const entries = S.cashflows.filter(cf => cf.isAdvance && !cf.delivered);
+  return {
+    total: entries.reduce((s, e) => s + e.amount, 0),
+    count: entries.length,
+    entries,
+  };
+}
+
 // ─── Add manual entry ─────────────────────────────────────────────────────────
 
 export function openAddCashflow() {

@@ -28,9 +28,10 @@ Preorder.init(render);
 Cashflow.init(render);
 
 // ── Expose cashflow helpers to render.js via window (render.js uses window._cf*) ──
-window._cfBuildLedger    = Cashflow.buildLedger;
-window._cfCalcSummary    = Cashflow.calcSummary;
-window._cfCategoryLabels = Cashflow.CATEGORY_LABELS;
+window._cfBuildLedger         = Cashflow.buildLedger;
+window._cfCalcSummary         = Cashflow.calcSummary;
+window._cfCategoryLabels      = Cashflow.CATEGORY_LABELS;
+window._cfAllTimePendingDp    = Cashflow.calcAllTimePendingDp;
 
 // ── goTab ────────────────────────────────────────────────────────────────────
 function goTab(tab, btn) {
