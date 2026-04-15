@@ -821,6 +821,33 @@ tbody tr:hover { background: var(--surface2); }
 .po-detail-lastpay  { font-size: 11px; color: var(--text3); margin-top: 4px; }
 .po-detail-arrived  { font-size: 11px; color: #16a34a; font-weight: 600; margin-top: 5px; }
 
+/* Dynamic date badges — Close PO & Payment Deadline */
+.po-dyn-badge {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700; letter-spacing: .2px;
+  padding: 2px 7px; border-radius: 20px;
+  white-space: nowrap; line-height: 1.4;
+}
+.po-badge-overdue { background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; }
+.po-badge-urgent  { background: #e11d48; color: #fff;    border: 1px solid #e11d48; }
+.po-badge-warn    { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+.po-badge-info    { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+
+/* Actions column: primary (Bayar/Buku Datang) + secondary (Edit/Hapus) grouped */
+.po-actions-wrap {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 8px;
+}
+.po-actions-primary { display: flex; gap: 4px; }
+.po-actions-secondary {
+  display: flex; gap: 2px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+.po-btn-pay   { color: var(--accent) !important; border-color: var(--accent-t) !important; }
+.po-btn-arrive{ color: #16a34a !important; border-color: #bbf7d0 !important; }
+
+
 /* Mobile: collapse to cards */
 @media (max-width: 768px) {
   .po-table colgroup, .po-table thead { display: none; }
