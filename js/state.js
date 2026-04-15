@@ -60,7 +60,7 @@ function sanitizePreorder(po) {
     readyDate:   fixDate(po.readyDate),
     dueDate:     fixDate(po.dueDate),
     paidAmount:  Number(po.paidAmount) || 0,
-    bookArrived: Boolean(po.bookArrived),
+    bookArrived: po.bookArrived === true || po.bookArrived === 'TRUE' || po.bookArrived === 'true',
     lastPayDate: fixDate(po.lastPayDate),
     paymentLog:  (po.paymentLog || []).map(p => ({ amount: Number(p.amount)||0, date: String(p.date||'') })),
     items: (po.items || []).map(i => ({
@@ -87,8 +87,10 @@ function sanitizeCashflow(cf) {
     category:  String(cf.category || 'lainnya'),
     amount:    Number(cf.amount) || 0,
     note:      String(cf.note || ''),
-    isAdvance: Boolean(cf.isAdvance),
-    delivered: cf.isAdvance ? Boolean(cf.delivered) : true,
+    isAdvance: cf.isAdvance === true || cf.isAdvance === 'TRUE' || cf.isAdvance === 'true',
+    delivered: (cf.isAdvance === true || cf.isAdvance === 'TRUE' || cf.isAdvance === 'true')
+      ? (cf.delivered === true || cf.delivered === 'TRUE' || cf.delivered === 'true')
+      : true,
     source:    'manual',
   };
 }
