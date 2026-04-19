@@ -189,6 +189,12 @@ Object.assign(window, {
   selectAllImport() { S.importRows.forEach(r=>{ if(r._status!=='error') r._checked=true; }); render(); },
   unselectAllImport() { S.importRows.forEach(r=>r._checked=false); render(); },
 
+  // Bulk Sales Upload
+  openBulkUpload:            Import.openBulkUpload,
+  handleBulkSalesFile:       Import.handleBulkSalesFile,
+  downloadBulkSalesTemplate: Import.downloadBulkSalesTemplate,
+  processBulkSales:          Import.processBulkSales,
+
   // Sync
   openSyncSettings:    Sync.openSyncSettings,
   testGsConnection:    Sync.testGsConnection,

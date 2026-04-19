@@ -597,6 +597,7 @@ export function render() {
       <div class="page-hdr">
         <div><div class="page-title">Riwayat Penjualan</div><div class="page-sub">${penjualanFiltered.length} transaksi periode ini · hapus = stok kembali</div></div>
         <div class="page-actions">
+          <button class="btn btn-ghost" onclick="openBulkUpload()" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">📤 Upload Bulk</button>
           <button class="btn btn-ghost" onclick="openSaleManual()">+ Catat Manual</button>
           <button class="btn btn-ghost" onclick="openBundleModal()" style="background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff">📦 Bundling</button>
           <button class="btn btn-primary" onclick="goTab('scanner')">⌖ Scanner</button>
@@ -614,6 +615,7 @@ export function render() {
           <div style="font-size:15px;font-weight:600;margin-bottom:6px">${S.sales.length === 0 ? 'Belum ada transaksi' : 'Tidak ada transaksi di periode ini'}</div>
           <div style="font-size:13px;color:var(--text3);margin-bottom:20px">${S.sales.length === 0 ? 'Catat penjualan manual atau gunakan scanner' : 'Coba ubah rentang tanggal di atas'}</div>
           ${S.sales.length === 0 ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="openBulkUpload()" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">📤 Upload Bulk</button>
             <button class="btn btn-ghost" onclick="openSaleManual()">+ Catat Manual</button>
             <button class="btn btn-ghost" onclick="openBundleModal()" style="background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff">📦 Bundling</button>
             <button class="btn btn-primary" onclick="goTab('scanner')">⌖ Buka Scanner</button>
