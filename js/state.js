@@ -20,6 +20,7 @@ export let scanOverPrice = null, scanOverNote = '';
 export let barcodeBuffer = '', lastKeyTime = 0;
 export let scanBundleMode = false, scanBundleItems = [];
 export let importRows = [], importDone = false, showImportPanel = false;
+export let bulkSalesRows = [], bulkSalesDone = false, showBulkSalesPanel = false;
 export let bundleItems = [], bundlePrice = 0, bundleNote = '';
 
 // ── Setters (needed because only declaring module can reassign) ──────────────
@@ -36,6 +37,8 @@ export const set = {
   scanBundleMode(v){ scanBundleMode=v; }, scanBundleItems(v){ scanBundleItems=v; },
   importRows(v){ importRows=v; }, importDone(v){ importDone=v; },
   showImportPanel(v){ showImportPanel=v; },
+  bulkSalesRows(v){ bulkSalesRows=v; }, bulkSalesDone(v){ bulkSalesDone=v; },
+  showBulkSalesPanel(v){ showBulkSalesPanel=v; },
   bundleItems(v){ bundleItems=v; }, bundlePrice(v){ bundlePrice=v; }, bundleNote(v){ bundleNote=v; },
 };
 

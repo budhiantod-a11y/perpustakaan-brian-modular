@@ -190,10 +190,13 @@ Object.assign(window, {
   unselectAllImport() { S.importRows.forEach(r=>r._checked=false); render(); },
 
   // Bulk Sales Upload
-  openBulkUpload:            Import.openBulkUpload,
+  toggleBulkSalesPanel()   { S.set.showBulkSalesPanel(!S.showBulkSalesPanel); S.set.bulkSalesRows([]); S.set.bulkSalesDone(false); render(); },
   handleBulkSalesFile:       Import.handleBulkSalesFile,
   downloadBulkSalesTemplate: Import.downloadBulkSalesTemplate,
+  toggleBulkSalesRow:        Import.toggleBulkSalesRow,
   processBulkSales:          Import.processBulkSales,
+  selectAllBulkSales()   { S.bulkSalesRows.forEach(r=>{ if(r._status!=='error') r._checked=true; }); render(); },
+  unselectAllBulkSales() { S.bulkSalesRows.forEach(r=>r._checked=false); render(); },
 
   // Sync
   openSyncSettings:    Sync.openSyncSettings,

@@ -2,7 +2,7 @@
 // import.js — CSV/Excel import for books (stok) + bulk sales upload
 // ═══════════════════════════════════════════════════════════════════════════
 import * as S from './state.js';
-import { showToast, openModal, closeModal, uid, today, fmt, getNormalPrice } from './helpers.js';
+import { showToast, uid, today, fmt, getNormalPrice } from './helpers.js';
 import { totalStock, fifoDeduct, fifoSim } from './fifo.js';
 
 let _render = () => {};
@@ -86,14 +86,9 @@ export function buildImportRows(rawHeaders, dataRows) {
 export function handleImportFile(input) {
   const file = input.files[0];
   if (!file) return;
-
   const isXLSX = /\.(xlsx|xls|ods)$/i.test(file.name);
-
   if (isXLSX) {
-    if (!window.XLSX) {
-      showToast('Memuat library Excel, coba lagi sebentar...', 'err');
-      return;
-    }
+    if (!window.XLSX) { showToast('Memuat library Excel, coba lagi sebentar...', 'err'); return; }
     const reader = new FileReader();
     reader.onload = e => {
       try {
@@ -101,20 +96,14 @@ export function handleImportFile(input) {
         const ws    = wb.Sheets[wb.SheetNames[0]];
         const data  = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         if (data.length < 2) { showToast('File kosong atau tidak valid', 'err'); return; }
-
         const rawHeaders = data[0].map(h => String(h).trim().toLowerCase());
         const rows = buildImportRows(rawHeaders, data.slice(1));
         if (!rows) return;
-        S.set.importRows(rows);
-        S.set.importDone(false);
-        _render();
+        S.set.importRows(rows); S.set.importDone(false); _render();
         showToast(`${S.importRows.length} baris berhasil dibaca dari Excel ✓`);
-      } catch(err) {
-        showToast('Gagal membaca file Excel: ' + err.message, 'err');
-      }
+      } catch(err) { showToast('Gagal membaca file Excel: ' + err.message, 'err'); }
     };
     reader.readAsArrayBuffer(file);
-
   } else {
     const reader = new FileReader();
     reader.onload = e => {
@@ -122,31 +111,23 @@ export function handleImportFile(input) {
         const text = e.target.result.replace(/^\uFEFF/, '');
         const lines = text.split(/\r?\n/).filter(l => l.trim());
         if (lines.length < 2) { showToast('File kosong atau tidak valid', 'err'); return; }
-
         const rawHeaders = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim().toLowerCase());
-
         function parseCSVLine(line) {
           const result = []; let cur = '', inQ = false;
           for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"') { inQ = !inQ; }
+            const ch = line[i]; if (ch === '"') { inQ = !inQ; }
             else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
             else cur += ch;
           }
           result.push(cur.trim());
           return result.map(v => v.replace(/^"|"$/g,''));
         }
-
         const dataRows = lines.slice(1).map(l => parseCSVLine(l));
         const rows = buildImportRows(rawHeaders, dataRows);
         if (!rows) return;
-        S.set.importRows(rows);
-        S.set.importDone(false);
-        _render();
+        S.set.importRows(rows); S.set.importDone(false); _render();
         showToast(`${S.importRows.length} baris berhasil dibaca dari CSV ✓`);
-      } catch(err) {
-        showToast('Gagal membaca file: ' + err.message, 'err');
-      }
+      } catch(err) { showToast('Gagal membaca file: ' + err.message, 'err'); }
     };
     reader.readAsText(file, 'UTF-8');
   }
@@ -174,34 +155,24 @@ export function commitImport() {
       const book = {
         id:uid(), barcode:r.barcode, title:r.judul, author:r.penulis,
         publisher:r.penerbit, category:r.kategori,
-        normalPrice: r.hargaNormal||r.hargaJual||0,
-        sellPrice: r.hargaNormal||r.hargaJual||0,
-        batches:[]
+        normalPrice: r.hargaNormal||r.hargaJual||0, sellPrice: r.hargaNormal||r.hargaJual||0, batches:[]
       };
       if (r.stokAwal > 0) {
         book.batches.push({ id:uid(), qty:r.stokAwal, remaining:r.stokAwal, buyPrice:r.hargaBeli||0, date:today() });
         S.restocks.push({ id:uid(), bookId:book.id, bookTitle:book.title, qty:r.stokAwal, buyPrice:r.hargaBeli||0, date:today() });
       }
-      S.books.push(book);
-      added++;
+      S.books.push(book); added++;
     }
   }
-  S.save();
-  S.set.importRows([]);
-  S.set.importDone(true);
-  showToast(`✓ ${added} buku baru · ${batched} batch ditambahkan`);
-  _render();
+  S.save(); S.set.importRows([]); S.set.importDone(true);
+  showToast(`✓ ${added} buku baru · ${batched} batch ditambahkan`); _render();
 }
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// NEW: Bulk Sales Upload
+// NEW: Bulk Sales Upload (inline panel, same pattern as stok import)
 // ═══════════════════════════════════════════════════════════════════════════
 
-// ── Bulk sales state (kept in module, not in global state) ───────────────
-let _bulkRows = [];
-
-// ── Download template ────────────────────────────────────────────────────
 export function downloadBulkSalesTemplate() {
   if (window.XLSX) {
     const ws = window.XLSX.utils.aoa_to_sheet([
@@ -230,59 +201,12 @@ export function downloadBulkSalesTemplate() {
   }
 }
 
-// ── Open bulk upload modal ───────────────────────────────────────────────
-export function openBulkUpload() {
-  _bulkRows = [];
-  openModal(`
-    <div class="modal-title">📤 Upload Penjualan Bulk</div>
-    <div style="font-size:13px;color:var(--text3);margin-bottom:16px">
-      Upload file Excel/CSV berisi data penjualan event. Satu baris = satu transaksi satuan.
-    </div>
-
-    <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Format kolom:</div>
-      <div style="font-size:12px;color:var(--text3);background:var(--bg);padding:10px 12px;border-radius:var(--radius-s);border:1px solid var(--border);font-family:monospace">
-        barcode (wajib), qty (wajib), harga_jual (opsional), tanggal (opsional), catatan (opsional)
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">
-        • Jika harga_jual kosong → pakai harga normal buku<br>
-        • Jika tanggal kosong → pakai tanggal hari ini
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="btn btn-ghost" onclick="downloadBulkSalesTemplate()" style="font-size:12px">
-        📄 Download Template
-      </button>
-    </div>
-
-    <div style="margin-bottom:16px">
-      <label style="display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">Pilih file (.xlsx, .csv):</label>
-      <input type="file" id="bulk-file-input" accept=".csv,.xlsx,.xls,.tsv"
-        onchange="handleBulkSalesFile(this)"
-        style="font-size:13px">
-    </div>
-
-    <div id="bulk-preview-area"></div>
-
-    <div class="modal-footer" id="bulk-modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Tutup</button>
-    </div>
-  `);
-}
-
-// ── Parse bulk sales file (Excel or CSV) ─────────────────────────────────
 export function handleBulkSalesFile(input) {
   const file = input.files[0];
   if (!file) return;
-
   const isXLSX = /\.(xlsx|xls|ods)$/i.test(file.name);
-
   if (isXLSX) {
-    if (!window.XLSX) {
-      showToast('Memuat library Excel, coba lagi sebentar...', 'err');
-      return;
-    }
+    if (!window.XLSX) { showToast('Memuat library Excel, coba lagi sebentar...', 'err'); return; }
     const reader = new FileReader();
     reader.onload = e => {
       try {
@@ -290,58 +214,44 @@ export function handleBulkSalesFile(input) {
         const ws   = wb.Sheets[wb.SheetNames[0]];
         const data = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         if (data.length < 2) { showToast('File kosong atau tidak valid', 'err'); return; }
-
         const rawHeaders = data[0].map(h => String(h).trim().toLowerCase());
         const parsed = buildBulkSalesRows(rawHeaders, data.slice(1));
         if (!parsed) return;
-        _bulkRows = parsed;
-        renderBulkPreview();
-        showToast(`${parsed.length} baris berhasil dibaca dari Excel ✓`);
-      } catch (err) {
-        showToast('Gagal membaca file Excel: ' + err.message, 'err');
-      }
+        S.set.bulkSalesRows(parsed); S.set.bulkSalesDone(false); _render();
+        showToast(`${parsed.length} baris berhasil dibaca ✓`);
+      } catch (err) { showToast('Gagal membaca file Excel: ' + err.message, 'err'); }
     };
     reader.readAsArrayBuffer(file);
-
   } else {
-    // CSV/TSV
     const reader = new FileReader();
     reader.onload = e => {
       try {
         const text = e.target.result.replace(/^\uFEFF/, '');
         const lines = text.split(/\r?\n/).filter(l => l.trim());
         if (lines.length < 2) { showToast('File kosong atau tidak valid', 'err'); return; }
-
         const sep = file.name.endsWith('.tsv') ? '\t' : ',';
         const rawHeaders = lines[0].split(sep).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
-
         function parseCSVLine(line) {
           const result = []; let cur = '', inQ = false;
           for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"') { inQ = !inQ; }
+            const ch = line[i]; if (ch === '"') { inQ = !inQ; }
             else if (ch === sep && !inQ) { result.push(cur.trim()); cur = ''; }
             else cur += ch;
           }
           result.push(cur.trim());
           return result.map(v => v.replace(/^"|"$/g, ''));
         }
-
         const dataRows = lines.slice(1).map(l => parseCSVLine(l));
         const parsed = buildBulkSalesRows(rawHeaders, dataRows);
         if (!parsed) return;
-        _bulkRows = parsed;
-        renderBulkPreview();
-        showToast(`${parsed.length} baris berhasil dibaca dari CSV ✓`);
-      } catch (err) {
-        showToast('Gagal membaca file: ' + err.message, 'err');
-      }
+        S.set.bulkSalesRows(parsed); S.set.bulkSalesDone(false); _render();
+        showToast(`${parsed.length} baris berhasil dibaca ✓`);
+      } catch (err) { showToast('Gagal membaca file: ' + err.message, 'err'); }
     };
     reader.readAsText(file, 'UTF-8');
   }
 }
 
-// ── Build & validate rows ────────────────────────────────────────────────
 function buildBulkSalesRows(rawHeaders, dataRows) {
   const COL = {
     barcode:    rawHeaders.indexOf('barcode'),
@@ -350,248 +260,81 @@ function buildBulkSalesRows(rawHeaders, dataRows) {
     tanggal:    rawHeaders.indexOf('tanggal'),
     catatan:    rawHeaders.indexOf('catatan'),
   };
-
   if (COL.barcode < 0 || COL.qty < 0) {
-    showToast('Kolom wajib tidak ditemukan: barcode, qty', 'err');
-    return null;
+    showToast('Kolom wajib tidak ditemukan: barcode, qty', 'err'); return null;
   }
-
-  // Build cumulative stock tracker
   const stockTracker = {};
-  S.books.forEach(b => {
-    if (b.barcode) stockTracker[b.barcode] = { book: b, available: totalStock(b) };
-  });
+  S.books.forEach(b => { if (b.barcode) stockTracker[b.barcode] = { book: b, available: totalStock(b) }; });
 
-  const rows = dataRows
-    .map((cells, idx) => {
-      const get = col => col >= 0 ? String(cells[col] ?? '').trim() : '';
-      const barcode   = get(COL.barcode);
-      const qtyRaw    = get(COL.qty);
-      const priceRaw  = get(COL.harga_jual);
-      const tanggal   = get(COL.tanggal);
-      const catatan   = get(COL.catatan);
+  return dataRows.map((cells, idx) => {
+    const get = col => col >= 0 ? String(cells[col] ?? '').trim() : '';
+    const barcode = get(COL.barcode), qtyRaw = get(COL.qty), priceRaw = get(COL.harga_jual);
+    const tanggal = get(COL.tanggal), catatan = get(COL.catatan);
+    if (!barcode && !qtyRaw) return null;
 
-      // Skip completely empty rows
-      if (!barcode && !qtyRaw) return null;
+    const qty = parseInt(String(qtyRaw).replace(/\D/g, '')) || 0;
+    const hargaJual = priceRaw ? (parseInt(String(priceRaw).replace(/\D/g, '')) || null) : null;
+    const r = { _row: idx+2, _status:'valid', _error:'', _book:null, _checked:true, barcode, qty, harga_jual:hargaJual, tanggal:tanggal||null, catatan:catatan||'' };
 
-      const qty       = parseInt(String(qtyRaw).replace(/\D/g, '')) || 0;
-      const hargaJual = priceRaw ? (parseInt(String(priceRaw).replace(/\D/g, '')) || null) : null;
+    if (!barcode) { r._status='error'; r._error='Barcode kosong'; r._checked=false; return r; }
+    const entry = stockTracker[barcode];
+    if (!entry) { r._status='error'; r._error='Barcode tidak ditemukan'; r._checked=false; return r; }
+    r._book = entry.book;
+    if (qty <= 0) { r._status='error'; r._error='Qty harus > 0'; r._checked=false; return r; }
+    if (qty > entry.available) { r._status='error'; r._error=`Stok tidak cukup (sisa: ${entry.available})`; r._checked=false; return r; }
+    entry.available -= qty;
 
-      const result = {
-        _row: idx + 2,
-        _status: 'valid',
-        _error: '',
-        _book: null,
-        barcode,
-        qty,
-        harga_jual: hargaJual,
-        tanggal: tanggal || null,
-        catatan: catatan || '',
-      };
-
-      // Validate barcode
-      if (!barcode) {
-        result._status = 'error';
-        result._error = 'Barcode kosong';
-        return result;
-      }
-
-      const entry = stockTracker[barcode];
-      if (!entry) {
-        result._status = 'error';
-        result._error = 'Barcode tidak ditemukan';
-        return result;
-      }
-      result._book = entry.book;
-
-      // Validate qty
-      if (qty <= 0) {
-        result._status = 'error';
-        result._error = 'Qty harus > 0';
-        return result;
-      }
-
-      // Check cumulative stock
-      if (qty > entry.available) {
-        result._status = 'error';
-        result._error = `Stok tidak cukup (sisa: ${entry.available})`;
-        return result;
-      }
-
-      // Deduct from tracker so next rows see reduced stock
-      entry.available -= qty;
-
-      // Validate date format if provided
-      if (tanggal && !/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) {
-        result._status = 'warning';
-        result._error = 'Format tanggal salah → pakai hari ini';
-        result.tanggal = null;
-      }
-
-      // Validate price
-      if (hargaJual !== null && hargaJual <= 0) {
-        result._status = 'warning';
-        result._error = 'Harga jual ≤ 0 → pakai harga normal';
-        result.harga_jual = null;
-      }
-
-      // Warn if sell price < buy price
-      if (hargaJual !== null && result._book && result._status === 'valid') {
-        const { cogs } = fifoSim(result._book, qty);
-        const hppPerPcs = qty > 0 ? Math.round(cogs / qty) : 0;
-        if (hargaJual < hppPerPcs) {
-          result._status = 'warning';
-          result._error = `Harga jual < modal (${fmt(hppPerPcs)}/pcs)`;
-        }
-      }
-
-      return result;
-    })
-    .filter(Boolean);
-
-  return rows;
-}
-
-// ── Render preview table inside modal ────────────────────────────────────
-function renderBulkPreview() {
-  const area = document.getElementById('bulk-preview-area');
-  if (!area) return;
-
-  const valid  = _bulkRows.filter(r => r._status === 'valid' || r._status === 'warning');
-  const errors = _bulkRows.filter(r => r._status === 'error');
-
-  const statusIcon = r => {
-    if (r._status === 'error')   return '<span style="color:var(--red)">❌</span>';
-    if (r._status === 'warning') return '<span style="color:var(--orange)">⚠️</span>';
-    return '<span style="color:var(--green)">✅</span>';
-  };
-
-  area.innerHTML = `
-    <div style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:600">${_bulkRows.length} baris ditemukan</div>
-      <div style="font-size:12px;padding:3px 10px;border-radius:12px;background:#dcfce7;color:#16a34a;font-weight:600">${valid.length} valid</div>
-      ${errors.length ? `<div style="font-size:12px;padding:3px 10px;border-radius:12px;background:#fef2f2;color:#dc2626;font-weight:600">${errors.length} error</div>` : ''}
-    </div>
-
-    <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-s);margin-bottom:16px">
-      <table style="width:100%;font-size:12px;border-collapse:collapse">
-        <thead>
-          <tr style="background:var(--bg);position:sticky;top:0">
-            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--border)">#</th>
-            <th style="padding:8px 6px;text-align:center;border-bottom:1px solid var(--border)">Status</th>
-            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--border)">Barcode</th>
-            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--border)">Judul</th>
-            <th style="padding:8px 6px;text-align:right;border-bottom:1px solid var(--border)">Qty</th>
-            <th style="padding:8px 6px;text-align:right;border-bottom:1px solid var(--border)">Harga</th>
-            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--border)">Tanggal</th>
-            <th style="padding:8px 6px;text-align:left;border-bottom:1px solid var(--border)">Keterangan</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${_bulkRows.map(r => {
-            const bgColor = r._status === 'error' ? '#fef2f2' : r._status === 'warning' ? '#fffbeb' : '';
-            const book = r._book;
-            const normalP = book ? getNormalPrice(book) : 0;
-            const displayPrice = r.harga_jual || normalP;
-            return `<tr style="border-bottom:1px solid var(--border);${bgColor ? 'background:' + bgColor : ''}">
-              <td style="padding:6px">${r._row}</td>
-              <td style="padding:6px;text-align:center">${statusIcon(r)}</td>
-              <td style="padding:6px;font-family:monospace;font-size:11px">${r.barcode}</td>
-              <td style="padding:6px">${book ? book.title : '<span style="color:var(--red)">—</span>'}</td>
-              <td style="padding:6px;text-align:right">${r.qty}</td>
-              <td style="padding:6px;text-align:right">${book ? fmt(displayPrice) : '—'}</td>
-              <td style="padding:6px">${r.tanggal || today()}</td>
-              <td style="padding:6px;font-size:11px;color:${r._status === 'error' ? 'var(--red)' : r._status === 'warning' ? 'var(--orange)' : 'var(--text3)'}">${r._error || r.catatan || ''}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-
-  // Update footer with process button
-  const footer = document.getElementById('bulk-modal-footer');
-  if (footer) {
-    footer.innerHTML = valid.length > 0
-      ? `${errors.length ? `<div style="font-size:12px;color:var(--text3);flex:1">${errors.length} baris error akan dilewati</div>` : '<div style="flex:1"></div>'}
-         <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-         <button class="btn btn-primary" onclick="processBulkSales()">✓ Proses ${valid.length} Transaksi</button>`
-      : `<div style="font-size:12px;color:var(--red);flex:1">Semua baris error — periksa file dan coba lagi</div>
-         <button class="btn btn-ghost" onclick="closeModal()">Tutup</button>`;
-  }
-}
-
-// ── Process valid rows: FIFO deduct + record sales ───────────────────────
-export function processBulkSales() {
-  const valid = _bulkRows.filter(r => r._status === 'valid' || r._status === 'warning');
-  if (!valid.length) { showToast('Tidak ada transaksi valid', 'err'); return; }
-
-  // Re-validate stock (in case state changed since preview)
-  const stockCheck = {};
-  S.books.forEach(b => {
-    if (b.barcode) stockCheck[b.barcode] = { book: b, available: totalStock(b) };
-  });
-
-  const processed = [];
-  const skipped = [];
-
-  for (const row of valid) {
-    const entry = stockCheck[row.barcode];
-    if (!entry || row.qty > entry.available) {
-      skipped.push({ row: row._row, barcode: row.barcode, reason: 'Stok tidak cukup saat proses' });
-      continue;
+    if (tanggal && !/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) { r._status='warning'; r._error='Format tanggal salah → pakai hari ini'; r.tanggal=null; }
+    if (hargaJual !== null && hargaJual <= 0) { r._status='warning'; r._error='Harga jual ≤ 0 → pakai harga normal'; r.harga_jual=null; }
+    if (hargaJual !== null && r._book && r._status === 'valid') {
+      const { cogs } = fifoSim(r._book, qty);
+      const hpp = qty > 0 ? Math.round(cogs / qty) : 0;
+      if (hargaJual < hpp) { r._status='warning'; r._error=`Harga < modal (${fmt(hpp)}/pcs)`; }
     }
+    return r;
+  }).filter(Boolean);
+}
 
-    const book    = entry.book;
-    const normalP = getNormalPrice(book);
-    const finP    = row.harga_jual || normalP;
-    const date    = row.tanggal || today();
-    const note    = row.catatan || '';
-    const isDiskon = finP !== normalP;
+export function toggleBulkSalesRow(idx) {
+  if (S.bulkSalesRows[idx]._status === 'error') return;
+  S.bulkSalesRows[idx]._checked = !S.bulkSalesRows[idx]._checked;
+  _render();
+}
 
-    // FIFO deduct (same as saveSaleManual)
+export function processBulkSales() {
+  const toProcess = S.bulkSalesRows.filter(r => r._checked && r._status !== 'error');
+  if (!toProcess.length) { showToast('Tidak ada transaksi yang dipilih', 'err'); return; }
+
+  const stockCheck = {};
+  S.books.forEach(b => { if (b.barcode) stockCheck[b.barcode] = { book: b, available: totalStock(b) }; });
+
+  const processed = [], skipped = [];
+  for (const row of toProcess) {
+    const entry = stockCheck[row.barcode];
+    if (!entry || row.qty > entry.available) { skipped.push({ row: row._row, reason: 'Stok tidak cukup saat proses' }); continue; }
+
+    const book = entry.book, normalP = getNormalPrice(book);
+    const finP = row.harga_jual || normalP, date = row.tanggal || today();
+    const note = row.catatan || '', isDiskon = finP !== normalP;
     const { cogs } = fifoDeduct(book.id, row.qty);
     const profit = row.qty * finP - cogs;
-
-    // Deduct from tracker
     entry.available -= row.qty;
 
     S.sales.push({
-      id:             uid(),
-      bookId:         book.id,
-      bookTitle:      book.title,
-      qty:            row.qty,
-      buyPrice:       Math.round(cogs / row.qty),
-      normalPrice:    normalP,
-      sellPrice:      normalP,
-      finalPrice:     finP,
-      finalSellPrice: finP,
-      cogs,
-      profit,
-      date,
-      via:            'bulk',
-      priceOverride:  isDiskon,
-      note:           note || (isDiskon ? 'bulk upload (harga event)' : 'bulk upload'),
+      id: uid(), bookId: book.id, bookTitle: book.title, qty: row.qty,
+      buyPrice: Math.round(cogs / row.qty), normalPrice: normalP, sellPrice: normalP,
+      finalPrice: finP, finalSellPrice: finP, cogs, profit, date,
+      via: 'bulk', priceOverride: isDiskon,
+      note: note || (isDiskon ? 'bulk upload (harga event)' : 'bulk upload'),
     });
-
     processed.push({ row: row._row, title: book.title, qty: row.qty });
   }
 
-  // Save & sync
-  S.save();
-  _bulkRows = [];
+  S.save(); S.set.bulkSalesRows([]); S.set.bulkSalesDone(true); _render();
 
-  // Close modal & re-render
-  closeModal();
-  _render();
-
-  // Show result
   if (skipped.length > 0) {
-    const skipMsg = skipped.map(s => `Baris ${s.row}: ${s.reason}`).join('\n');
     showToast(`${processed.length} transaksi berhasil, ${skipped.length} dilewati`, 'ok');
-    setTimeout(() => {
-      alert(`⚠️ ${skipped.length} baris dilewati:\n\n${skipMsg}`);
-    }, 500);
+    setTimeout(() => alert(`⚠️ ${skipped.length} baris dilewati:\n\n${skipped.map(s => `Baris ${s.row}: ${s.reason}`).join('\n')}`), 500);
   } else {
     showToast(`✓ ${processed.length} transaksi bulk berhasil diproses!`);
   }

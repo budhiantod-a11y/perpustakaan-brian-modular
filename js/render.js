@@ -593,16 +593,140 @@ export function render() {
   // ── PENJUALAN ──────────────────────────────────────────────────────────────
   if (S.currentTab === 'penjualan') {
     const penjualanFiltered = S.sales.filter(s => s.date >= S.period.from && s.date <= S.period.to);
+    const bsRows = S.bulkSalesRows;
+    const bsValid = bsRows.filter(r => r._status !== 'error');
+    const bsError = bsRows.filter(r => r._status === 'error');
+    const bsChecked = bsRows.filter(r => r._checked && r._status !== 'error');
+
     area.innerHTML = `
       <div class="page-hdr">
         <div><div class="page-title">Riwayat Penjualan</div><div class="page-sub">${penjualanFiltered.length} transaksi periode ini · hapus = stok kembali</div></div>
         <div class="page-actions">
-          <button class="btn btn-ghost" onclick="openBulkUpload()" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">📤 Upload Bulk</button>
+          <button class="btn btn-ghost" onclick="toggleBulkSalesPanel()" style="${S.showBulkSalesPanel?'background:#dbeafe;color:#2563eb;border-color:#93c5fd':'background:#eff6ff;color:#2563eb;border-color:#bfdbfe'}">
+            📤 Upload Bulk
+          </button>
           <button class="btn btn-ghost" onclick="openSaleManual()">+ Catat Manual</button>
           <button class="btn btn-ghost" onclick="openBundleModal()" style="background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff">📦 Bundling</button>
           <button class="btn btn-primary" onclick="goTab('scanner')">⌖ Scanner</button>
         </div>
       </div>
+
+      <!-- BULK SALES PANEL (inline, collapsible) -->
+      ${S.showBulkSalesPanel ? `
+      <div class="card" style="border:1.5px solid #bfdbfe;background:linear-gradient(to bottom,#eff6ff,var(--surface));margin-bottom:20px">
+
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#2563eb">📤 Upload Penjualan Bulk</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">Upload data penjualan event sekaligus · lookup by barcode · FIFO otomatis</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="toggleBulkSalesPanel()">✕ Tutup</button>
+        </div>
+
+        <!-- Step 1: Template -->
+        <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-s);margin-bottom:12px;flex-wrap:wrap">
+          <div style="width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">1</div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:13px;font-weight:600">Download template</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+              Kolom: <code style="background:var(--bg);padding:1px 5px;border-radius:3px">barcode</code>
+              <code style="background:var(--bg);padding:1px 5px;border-radius:3px">qty</code>
+              <code style="background:var(--bg);padding:1px 5px;border-radius:3px">harga_jual</code>
+              <code style="background:var(--bg);padding:1px 5px;border-radius:3px">tanggal</code>
+              <code style="background:var(--bg);padding:1px 5px;border-radius:3px">catatan</code>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="downloadBulkSalesTemplate()">↓ Download Template (.xlsx)</button>
+        </div>
+
+        <!-- Step 2: Upload -->
+        <div style="display:flex;align-items:flex-start;gap:14px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-s);margin-bottom:${bsRows.length?'12px':'0'};flex-wrap:wrap">
+          <div style="width:28px;height:28px;border-radius:50%;background:${bsRows.length?'var(--green)':'#2563eb'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;margin-top:2px">2</div>
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:8px">${bsRows.length ? `File dibaca — ${bsRows.length} baris ditemukan` : 'Upload file Excel atau CSV'}</div>
+            <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 16px;background:var(--bg);border:1.5px dashed var(--border2);border-radius:var(--radius-s);cursor:pointer;font-size:12px;font-weight:500;color:var(--text2);transition:all .15s"
+              onmouseover="this.style.borderColor='#2563eb';this.style.color='#2563eb'"
+              onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'">
+              📄 Pilih file Excel atau CSV
+              <input type="file" accept=".xlsx,.xls,.csv,.ods,.tsv" style="display:none" onchange="handleBulkSalesFile(this)">
+            </label>
+            ${bsRows.length ? `
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <span class="badge badge-green">✓ ${bsValid.length} valid</span>
+              ${bsError.length ? `<span class="badge badge-red">✕ ${bsError.length} error</span>` : ''}
+            </div>` : ''}
+          </div>
+          ${bsRows.length ? `<button class="btn btn-ghost btn-sm" onclick="toggleBulkSalesPanel()" style="margin-top:2px">Ganti file</button>` : ''}
+        </div>
+
+        <!-- Step 3: Preview table -->
+        ${bsRows.length ? `
+        <div style="padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-s)">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+            <div style="width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">3</div>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600">Review & konfirmasi</div>
+              <div style="font-size:11px;color:var(--text3)">${bsChecked.length} baris dipilih</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="selectAllBulkSales()">Pilih Semua</button>
+              <button class="btn btn-ghost btn-sm" onclick="unselectAllBulkSales()">Batal Semua</button>
+              <button class="btn btn-primary btn-sm" onclick="processBulkSales()" ${bsChecked.length===0?'disabled style="opacity:.5;cursor:not-allowed"':''}>
+                ✓ Proses ${bsChecked.length} Transaksi
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th style="width:32px"></th>
+                <th>Barcode</th><th>Judul</th><th>Qty</th>
+                <th>Harga Jual</th><th>Tanggal</th><th>Status</th>
+              </tr></thead>
+              <tbody>
+                ${bsRows.map((r,i) => {
+                  const book = r._book;
+                  const normalP = book ? getNormalPrice(book) : 0;
+                  const displayPrice = r.harga_jual || normalP;
+                  return `
+                  <tr style="cursor:${r._status!=='error'?'pointer':'default'};${r._status==='error'?'opacity:.5':''}" onclick="${r._status!=='error'?`toggleBulkSalesRow(${i})`:''}">
+                    <td>
+                      ${r._status==='error'
+                        ? `<span style="color:var(--red);font-size:15px">✕</span>`
+                        : `<input type="checkbox" ${r._checked?'checked':''} onclick="event.stopPropagation();toggleBulkSalesRow(${i})" style="width:15px;height:15px;cursor:pointer;accent-color:#2563eb">`}
+                    </td>
+                    <td style="font-family:monospace;font-size:11px;color:var(--text3)">${r.barcode||'—'}</td>
+                    <td style="font-weight:600">${book ? book.title : '<span style="color:var(--red)">—</span>'}</td>
+                    <td>${r.qty}</td>
+                    <td>${book ? fmt(displayPrice) : '—'}</td>
+                    <td style="font-size:12px;color:var(--text3)">${r.tanggal || today()}</td>
+                    <td>
+                      ${r._status==='valid'   ? `<span class="badge badge-green">✓ Valid</span>` : ''}
+                      ${r._status==='warning' ? `<span class="badge badge-orange">⚠ ${r._error}</span>` : ''}
+                      ${r._status==='error'   ? `<span class="badge badge-red">${r._error}</span>` : ''}
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>` : `
+        <div style="margin-top:10px;padding:12px 16px;background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius-s);font-size:12px;color:var(--text3);line-height:2">
+          <strong style="color:var(--text2)">Tips:</strong>
+          <code style="background:var(--bg);padding:1px 4px;border-radius:3px">harga_jual</code> kosong → pakai harga normal ·
+          <code style="background:var(--bg);padding:1px 4px;border-radius:3px">tanggal</code> kosong → pakai hari ini ·
+          Upload <strong>.xlsx</strong> langsung dari Excel, atau .csv juga bisa
+        </div>`}
+
+        ${S.bulkSalesDone && !bsRows.length ? `
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;padding:12px 16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius-s)">
+          <span style="font-size:18px">✅</span>
+          <div style="font-size:13px;font-weight:600;color:var(--green)">Bulk upload berhasil! Transaksi sudah tercatat.</div>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="toggleBulkSalesPanel()">Upload lagi</button>
+        </div>` : ''}
+      </div>` : ''}
+
       <div class="period-bar" style="margin-bottom:16px">
         <label>Periode</label>
         <input type="date" value="${S.period.from}" onchange="setPeriodFrom(this.value)">
@@ -615,7 +739,7 @@ export function render() {
           <div style="font-size:15px;font-weight:600;margin-bottom:6px">${S.sales.length === 0 ? 'Belum ada transaksi' : 'Tidak ada transaksi di periode ini'}</div>
           <div style="font-size:13px;color:var(--text3);margin-bottom:20px">${S.sales.length === 0 ? 'Catat penjualan manual atau gunakan scanner' : 'Coba ubah rentang tanggal di atas'}</div>
           ${S.sales.length === 0 ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-            <button class="btn btn-ghost" onclick="openBulkUpload()" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">📤 Upload Bulk</button>
+            <button class="btn btn-ghost" onclick="toggleBulkSalesPanel()" style="background:#eff6ff;color:#2563eb;border-color:#bfdbfe">📤 Upload Bulk</button>
             <button class="btn btn-ghost" onclick="openSaleManual()">+ Catat Manual</button>
             <button class="btn btn-ghost" onclick="openBundleModal()" style="background:#f3e8ff;color:#7c3aed;border-color:#e9d5ff">📦 Bundling</button>
             <button class="btn btn-primary" onclick="goTab('scanner')">⌖ Buka Scanner</button>
