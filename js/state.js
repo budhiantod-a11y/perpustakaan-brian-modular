@@ -22,6 +22,7 @@ export let scanBundleMode = false, scanBundleItems = [];
 export let importRows = [], importDone = false, showImportPanel = false;
 export let bulkSalesRows = [], bulkSalesDone = false, showBulkSalesPanel = false;
 export let bundleItems = [], bundlePrice = 0, bundleNote = '';
+export let manualCartItems = [];
 
 // ── Setters (needed because only declaring module can reassign) ──────────────
 export const set = {
@@ -40,6 +41,7 @@ export const set = {
   bulkSalesRows(v){ bulkSalesRows=v; }, bulkSalesDone(v){ bulkSalesDone=v; },
   showBulkSalesPanel(v){ showBulkSalesPanel=v; },
   bundleItems(v){ bundleItems=v; }, bundlePrice(v){ bundlePrice=v; }, bundleNote(v){ bundleNote=v; },
+  manualCartItems(v){ manualCartItems=v; },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

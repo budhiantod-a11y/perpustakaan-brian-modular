@@ -9,62 +9,103 @@ let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
 
 export function openSaleManual() {
-  openModal(`
-    <div class="modal-title">Catat Penjualan</div>
-    <div class="field">
-      <label>Pilih Buku</label>
-      <input type="hidden" id="f_bid" value="">
-      <div style="position:relative">
-        <input class="inp" id="sale-search-input" type="text" placeholder="Ketik judul buku..." autocomplete="off"
-          oninput="saleSearchFilter(this.value)">
-        <div id="sale-search-results" style="position:absolute;left:0;right:0;top:100%;z-index:10;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-s) var(--radius-s);display:none;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
-      </div>
-      <div id="sale-selected-book" style="display:none;margin-top:8px;padding:8px 12px;background:var(--accent-s);border:1px solid var(--accent-t);border-radius:var(--radius-s);font-size:13px;display:none">
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <div class="field"><label>Jumlah</label><input class="inp" id="f_qty" type="number" min="1" value="1" oninput="onSaleChange()" style="max-width:120px"></div>
-      <div class="field"><label>Tanggal</label><input class="inp" id="f_date" type="date" value="${today()}" max="${today()}" style="max-width:180px"></div>
-    </div>
-    <div id="price-section" style="display:none">
-      <div class="override-panel">
-        <div class="override-title">💰 Harga Jual</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:flex-end">
-          <div class="field" style="margin-bottom:0">
-            <label style="font-size:11px">Harga Modal (FIFO)</label>
-            <input class="inp" id="f_hpp" type="number" readonly style="background:var(--bg);color:var(--text3)">
-          </div>
-          <div class="field" style="margin-bottom:0">
-            <label style="font-size:11px">Harga Normal</label>
-            <input class="inp" id="f_default" type="number" readonly style="background:var(--bg)">
-          </div>
-          <div class="field" style="margin-bottom:0">
-            <label style="font-size:11px">Harga Final <span id="over-tag" style="display:none;color:var(--orange);font-size:10px;font-weight:700">✎ diskon</span></label>
-            <input class="inp" id="f_final" type="number" oninput="onSaleChange()" style="border-color:var(--accent)">
-          </div>
-        </div>
-        <div id="f_diff_wrap" style="margin-top:8px;display:flex;gap:8px;align-items:center">
-          <div id="f_diff" class="price-diff-pill diff-same">—</div>
-          <div id="f_margin" style="font-size:11px;color:var(--text3)"></div>
-        </div>
-        <div id="note-wrap" style="display:none;margin-top:10px">
-          <div class="field" style="margin-bottom:0">
-            <label>Catatan <span style="color:var(--text3);font-weight:400">(wajib jika harga final ≠ normal)</span></label>
-            <input class="inp" id="f_note" placeholder="e.g. diskon member, harga event, negosiasi...">
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="sale-preview" style="display:none"></div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveSaleManual()">Simpan Penjualan</button>
-    </div>`);
+  S.set.manualCartItems([]);
+  renderManualSaleModal();
 }
 
-// ── Sale search + select ─────────────────────────────────────────────────────
-export function saleSearchFilter(query) {
-  const resultsEl = document.getElementById('sale-search-results');
+export function renderManualSaleModal() {
+  const items = S.manualCartItems;
+  const canSubmit = items.length > 0 && items.every(item => {
+    const b = S.books.find(x => x.id === item.bookId);
+    return b && totalStock(b) >= item.qty && item.finalPrice > 0;
+  });
+
+  openModal(`
+    <div class="modal-title">Catat Penjualan</div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Cari buku untuk ditambahkan:</div>
+      <div style="position:relative">
+        <input class="inp" id="manual-cart-search-input" type="text" placeholder="Ketik judul buku..." autocomplete="off"
+          oninput="manualCartSearchFilter(this.value)">
+        <div id="manual-cart-search-results" style="position:absolute;left:0;right:0;top:100%;z-index:10;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-s) var(--radius-s);display:none;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+      </div>
+    </div>
+
+    ${items.length ? `
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">
+        Daftar buku (${items.length} judul · ${items.reduce((s,i)=>s+i.qty,0)} pcs):
+      </div>
+      ${items.map((item, idx) => {
+        const b = S.books.find(x => x.id === item.bookId);
+        if (!b) return '';
+        const stock = totalStock(b);
+        const normalP = getNormalPrice(b);
+        const { cogs } = fifoSim(b, item.qty);
+        const hppPerPcs = item.qty > 0 ? Math.round(cogs / item.qty) : 0;
+        const kurang = stock < item.qty;
+        const diff = item.finalPrice - normalP;
+        const diffClass = diff < 0 ? 'diff-down' : diff > 0 ? 'diff-up' : 'diff-same';
+        const diffText = diff < 0 ? fmt(diff) : diff > 0 ? '+'+fmt(diff) : '—';
+        const isDiskon = item.finalPrice !== normalP;
+        return `<div class="bundle-item-row" style="${kurang ? 'border-color:var(--red);background:#fef2f2' : ''}">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px">${b.title}</div>
+            <div style="font-size:11px;color:var(--text3)">Normal: ${fmt(normalP)} · HPP: ${fmt(hppPerPcs)}/pcs · Stok: ${stock}</div>
+            ${kurang ? `<div style="font-size:11px;color:var(--red);font-weight:600">⚠ Stok tidak cukup!</div>` : ''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            <div style="display:flex;align-items:center;gap:6px">
+              <button class="btn btn-ghost btn-xs" onclick="manualCartChangeQty(${idx},-1)">−</button>
+              <span style="font-weight:700;min-width:24px;text-align:center">${item.qty}</span>
+              <button class="btn btn-ghost btn-xs" onclick="manualCartChangeQty(${idx},+1)">+</button>
+              <button class="btn btn-danger btn-xs" style="margin-left:4px" onclick="manualCartRemoveItem(${idx})">✕</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <label style="font-size:11px;color:var(--text3);white-space:nowrap">Harga:</label>
+              <input class="inp" type="number" id="manual-price-${idx}" value="${item.finalPrice}"
+                oninput="manualCartUpdatePrice(${idx},+this.value)"
+                style="width:110px;font-size:13px;padding:4px 8px;${isDiskon ? 'border-color:var(--orange)' : 'border-color:var(--accent)'}">
+              <span class="price-diff-pill ${diffClass}" id="manual-diff-${idx}">${diffText}</span>
+            </div>
+            <div id="manual-note-wrap-${idx}" style="width:100%;display:${isDiskon ? 'block' : 'none'}">
+              <input class="inp" type="text" id="manual-note-${idx}"
+                value="${(item.note||'').replace(/"/g,'&quot;')}"
+                placeholder="Catatan diskon (wajib)..."
+                oninput="manualCartUpdateNote(${idx},this.value)"
+                style="font-size:12px;padding:4px 8px;width:100%;box-sizing:border-box">
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="field" style="margin-bottom:4px">
+      <label>Tanggal</label>
+      <input class="inp" id="manual-cart-date" type="date" value="${today()}" max="${today()}" style="max-width:180px">
+    </div>` : `
+    <div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;background:var(--bg);border-radius:var(--radius-s);margin-bottom:16px">
+      Belum ada buku dipilih.<br>Ketik judul buku di atas untuk menambahkan.
+    </div>`}
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" ${!canSubmit ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}
+        onclick="saveSaleManual()">
+        Simpan${items.length ? ` (${items.reduce((s,i)=>s+i.qty,0)} buku · ${items.length} judul)` : ''}
+      </button>
+    </div>`);
+
+  setTimeout(() => {
+    const inp = document.getElementById('manual-cart-search-input');
+    if (inp) inp.focus();
+  }, 50);
+}
+
+// ── Manual cart helpers ───────────────────────────────────────────────────────
+export function manualCartSearchFilter(query) {
+  const resultsEl = document.getElementById('manual-cart-search-results');
   if (!resultsEl) return;
   const q = query.toLowerCase().trim();
   if (!q) { resultsEl.style.display = 'none'; return; }
@@ -80,105 +121,71 @@ export function saleSearchFilter(query) {
   resultsEl.innerHTML = matches.map(b => `
     <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"
       onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
-      onclick="saleSelectBook(${b.id})">
+      onclick="manualCartAddById(${b.id})">
       <div>
         <div style="font-weight:600;font-size:13px">${b.title}</div>
         <div style="font-size:11px;color:var(--text3)">Stok: ${totalStock(b)} · ${fmt(getNormalPrice(b))}</div>
       </div>
-      <span style="font-size:11px;color:var(--accent);background:var(--accent-s);padding:2px 8px;border-radius:12px;white-space:nowrap">Pilih</span>
+      <span style="font-size:11px;color:var(--accent);background:var(--accent-s);padding:2px 8px;border-radius:12px;white-space:nowrap">+ Tambah</span>
     </div>`).join('');
   resultsEl.style.display = 'block';
 }
 
-export function saleSelectBook(bookId) {
+export function manualCartAddById(bookId) {
   const book = S.books.find(b => b.id === bookId);
   if (!book) return;
-  // Set hidden input
-  document.getElementById('f_bid').value = bookId;
-  // Update search input to show selected book
-  const searchInp = document.getElementById('sale-search-input');
-  if (searchInp) { searchInp.value = book.title; searchInp.style.borderColor = 'var(--accent)'; searchInp.style.background = 'var(--accent-s)'; }
-  // Hide results
-  const resultsEl = document.getElementById('sale-search-results');
-  if (resultsEl) resultsEl.style.display = 'none';
-  // Show selected badge
-  const selEl = document.getElementById('sale-selected-book');
-  if (selEl) {
-    selEl.style.display = 'flex';
-    selEl.innerHTML = `<div style="flex:1"><strong>${book.title}</strong> · Stok: ${totalStock(book)} · ${fmt(getNormalPrice(book))}</div><span style="cursor:pointer;color:var(--accent);font-size:12px" onclick="saleClearBook()">✕ Ganti</span>`;
+  const existing = S.manualCartItems.find(i => i.bookId === bookId);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    S.manualCartItems.push({ bookId, qty: 1, finalPrice: getNormalPrice(book), note: '' });
   }
-  // Trigger price section
-  onBookChange();
+  renderManualSaleModal();
+  setTimeout(() => {
+    const inp = document.getElementById('manual-cart-search-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+  }, 50);
 }
 
-export function saleClearBook() {
-  document.getElementById('f_bid').value = '';
-  const searchInp = document.getElementById('sale-search-input');
-  if (searchInp) { searchInp.value = ''; searchInp.style.borderColor = ''; searchInp.style.background = ''; searchInp.focus(); }
-  const selEl = document.getElementById('sale-selected-book');
-  if (selEl) selEl.style.display = 'none';
-  const sec = document.getElementById('price-section');
-  if (sec) sec.style.display = 'none';
-  const pv = document.getElementById('sale-preview');
-  if (pv) pv.style.display = 'none';
+export function manualCartRemoveItem(idx) {
+  S.manualCartItems.splice(idx, 1);
+  renderManualSaleModal();
 }
 
-export function onBookChange() {
-  const bid = +document.getElementById('f_bid')?.value;
-  const sec = document.getElementById('price-section');
-  if (!bid) { if(sec) sec.style.display='none'; return; }
-  const book = S.books.find(b => b.id===bid);
-  const normalP = getNormalPrice(book);
-  sec.style.display = 'block';
-  document.getElementById('f_default').value = normalP;
-  document.getElementById('f_final').value   = normalP;
-  onSaleChange();
+export function manualCartChangeQty(idx, delta) {
+  const item = S.manualCartItems[idx];
+  if (!item) return;
+  const newQty = item.qty + delta;
+  if (newQty <= 0) { manualCartRemoveItem(idx); return; }
+  const b = S.books.find(x => x.id === item.bookId);
+  if (newQty > totalStock(b)) { showToast('Stok tidak cukup!', 'err'); return; }
+  item.qty = newQty;
+  renderManualSaleModal();
 }
 
-export function onSaleChange() {
-  const bid   = +document.getElementById('f_bid')?.value;
-  const qty   = +document.getElementById('f_qty')?.value || 1;
-  const pv    = document.getElementById('sale-preview');
-  if (!bid) return;
-  const book     = S.books.find(b => b.id===bid);
-  const normalP  = getNormalPrice(book);
-  const finP     = +document.getElementById('f_final')?.value || normalP;
-  const diff     = finP - normalP;
-  const isDiskon = finP !== normalP;
-
-  // Update HPP estimate from FIFO sim
-  const { cogs, details } = fifoSim(book, qty);
-  const hppPerPcs = qty > 0 ? Math.round(cogs / qty) : 0;
-  const hppEl = document.getElementById('f_hpp');
-  if (hppEl) hppEl.value = hppPerPcs;
-
-  const diffEl = document.getElementById('f_diff');
+export function manualCartUpdatePrice(idx, val) {
+  const item = S.manualCartItems[idx];
+  if (!item) return;
+  item.finalPrice = isNaN(val) ? 0 : val;
+  const b = S.books.find(x => x.id === item.bookId);
+  const normalP = getNormalPrice(b);
+  const diff = item.finalPrice - normalP;
+  const diffEl = document.getElementById(`manual-diff-${idx}`);
+  const priceEl = document.getElementById(`manual-price-${idx}`);
+  const noteWrapEl = document.getElementById(`manual-note-wrap-${idx}`);
   if (diffEl) {
     if (diff < 0)      { diffEl.textContent = fmt(diff);     diffEl.className = 'price-diff-pill diff-down'; }
     else if (diff > 0) { diffEl.textContent = '+'+fmt(diff); diffEl.className = 'price-diff-pill diff-up'; }
     else               { diffEl.textContent = '—';           diffEl.className = 'price-diff-pill diff-same'; }
   }
-  const marginEl = document.getElementById('f_margin');
-  if (marginEl && finP > 0) {
-    const profitPcs = finP - hppPerPcs;
-    marginEl.textContent = `Margin per pcs: ${fmt(profitPcs)} (${Math.round(profitPcs/finP*100)}%)`;
-    marginEl.style.color = profitPcs >= 0 ? 'var(--green)' : 'var(--red)';
-  }
-  document.getElementById('over-tag').style.display  = isDiskon ? 'inline' : 'none';
-  document.getElementById('note-wrap').style.display = isDiskon ? 'block'  : 'none';
+  if (priceEl) priceEl.style.borderColor = diff !== 0 ? 'var(--orange)' : 'var(--accent)';
+  if (noteWrapEl) noteWrapEl.style.display = diff !== 0 ? 'block' : 'none';
+}
 
-  const revenue = qty * finP, profit = revenue - cogs;
-  if (pv) {
-    pv.style.display = 'block';
-    pv.innerHTML = `<div class="preview-box">
-      <strong>Preview FIFO:</strong><br>${details.map(d=>`Batch ${d.batchDate}: ${d.qty} × ${fmt(d.buyPrice)}`).join('<br>')}
-      <div class="preview-stats">
-        <div><div class="preview-stat-label">Revenue</div><div class="preview-stat-value" style="color:var(--green)">${fmt(revenue)}</div></div>
-        <div><div class="preview-stat-label">HPP Modal</div><div class="preview-stat-value" style="color:var(--red)">${fmt(cogs)}</div></div>
-        <div><div class="preview-stat-label">Profit Real</div><div class="preview-stat-value" style="color:${profit>=0?'var(--green)':'var(--red)'}">${fmt(profit)}</div></div>
-      </div>
-    </div>`;
-  }
+export function manualCartUpdateNote(idx, val) {
+  const item = S.manualCartItems[idx];
+  if (!item) return;
+  item.note = val;
 }
 
 
@@ -227,35 +234,63 @@ export function onScanNoteInput(el) {
 }
 
 export function saveSaleManual() {
-  const bid  = +document.getElementById('f_bid')?.value;
-  const qty  = +document.getElementById('f_qty')?.value;
-  const date = document.getElementById('f_date')?.value || today();
-  if (!bid||!qty) { showToast('Lengkapi field!', 'err'); return; }
-  if (qty <= 0) { showToast('Jumlah harus lebih dari 0', 'err'); return; }
-  if (!date) { showToast('Tanggal harus diisi', 'err'); return; }
-  const book = S.books.find(b => b.id===bid);
-  if (qty > totalStock(book)) { showToast('Stok tidak cukup!', 'err'); return; }
-  const normalP   = getNormalPrice(book);
-  const finP      = +document.getElementById('f_final')?.value || normalP;
-  if (finP <= 0) { showToast('Harga final harus lebih dari 0', 'err'); return; }
-  const note      = document.getElementById('f_note')?.value?.trim()||'';
-  const isDiskon  = finP !== normalP;
-  if (isDiskon && !note) { showToast('Isi catatan untuk harga final yang berbeda dari normal', 'err'); return; }
-  const { cogs } = fifoDeduct(bid, qty);
-  const profit = qty * finP - cogs;
-  S.sales.push({
-    id:uid(), bookId:bid, bookTitle:book.title, qty,
-    buyPrice: Math.round(cogs/qty),
-    normalPrice: normalP,
-    sellPrice: normalP,
-    finalPrice: finP,
-    finalSellPrice: finP,
-    cogs, profit,
-    date, via:'manual',
-    priceOverride: isDiskon,
-    note
-  });
-  closeModal(); S.save(); showToast('Penjualan dicatat ✓'); _render();
+  const items = S.manualCartItems;
+  if (!items.length) { showToast('Tambahkan minimal 1 buku', 'err'); return; }
+  const date = document.getElementById('manual-cart-date')?.value || today();
+
+  // Read latest DOM values into state before validating (handles fast typing edge cases)
+  for (let idx = 0; idx < items.length; idx++) {
+    const priceEl = document.getElementById(`manual-price-${idx}`);
+    const noteEl  = document.getElementById(`manual-note-${idx}`);
+    if (priceEl) items[idx].finalPrice = +priceEl.value || 0;
+    if (noteEl)  items[idx].note = noteEl.value?.trim() || '';
+  }
+
+  // Validate each item
+  for (const item of items) {
+    const b = S.books.find(x => x.id === item.bookId);
+    if (!b) { showToast('Data buku tidak valid', 'err'); return; }
+    if (item.qty <= 0) { showToast(`Jumlah "${b.title}" harus lebih dari 0`, 'err'); return; }
+    if (item.finalPrice <= 0) { showToast(`Harga "${b.title}" harus lebih dari 0`, 'err'); return; }
+    if (totalStock(b) < item.qty) { showToast(`Stok "${b.title}" tidak cukup!`, 'err'); return; }
+    const normalP = getNormalPrice(b);
+    if (item.finalPrice !== normalP && !item.note) {
+      showToast(`Isi catatan untuk "${b.title}" (harga beda dari normal)`, 'err'); return;
+    }
+  }
+
+  const groupId = items.length > 1 ? 'mg_' + uid() : null;
+
+  for (const item of items) {
+    const book   = S.books.find(x => x.id === item.bookId);
+    const normalP = getNormalPrice(book);
+    const { cogs } = fifoDeduct(item.bookId, item.qty);
+    const profit   = item.qty * item.finalPrice - cogs;
+    const isDiskon = item.finalPrice !== normalP;
+    S.sales.push({
+      id: uid(),
+      bookId: item.bookId,
+      bookTitle: book.title,
+      qty: item.qty,
+      buyPrice: Math.round(cogs / item.qty),
+      normalPrice: normalP,
+      sellPrice: normalP,
+      finalPrice: item.finalPrice,
+      finalSellPrice: item.finalPrice,
+      cogs, profit,
+      date, via: 'manual',
+      priceOverride: isDiskon,
+      note: item.note || '',
+      ...(groupId ? { groupId } : {}),
+    });
+  }
+
+  const totalPcs = items.reduce((s, i) => s + i.qty, 0);
+  closeModal();
+  S.save();
+  showToast(`✓ ${items.length} judul · ${totalPcs} buku dicatat`);
+  S.set.manualCartItems([]);
+  _render();
 }
 
 export function deleteSale(saleId) {
