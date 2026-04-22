@@ -268,13 +268,39 @@ function buildBulkSalesRows(rawHeaders, dataRows) {
 
   return dataRows.map((cells, idx) => {
     const get = col => col >= 0 ? String(cells[col] ?? '').trim() : '';
+    const getRaw = col => col >= 0 ? cells[col] : '';
     const barcode = get(COL.barcode), qtyRaw = get(COL.qty), priceRaw = get(COL.harga_jual);
-    const tanggal = get(COL.tanggal), catatan = get(COL.catatan);
+    const catatan = get(COL.catatan);
     if (!barcode && !qtyRaw) return null;
+
+    // ── Fix tanggal: handle Excel serial number, Date object, string ──
+    let tanggal = null;
+    const rawDate = getRaw(COL.tanggal);
+    if (rawDate) {
+      if (typeof rawDate === 'number' && rawDate > 30000 && rawDate < 100000) {
+        // Excel serial date → convert to JS Date
+        // Excel epoch is 1899-12-30, serial 1 = 1900-01-01
+        const d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+        tanggal = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      } else if (rawDate instanceof Date) {
+        tanggal = rawDate.getFullYear()+'-'+String(rawDate.getMonth()+1).padStart(2,'0')+'-'+String(rawDate.getDate()).padStart(2,'0');
+      } else {
+        const s = String(rawDate).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+          tanggal = s;
+        } else {
+          // Try parsing as Date string (e.g. "4/21/2026", "21 Apr 2026")
+          const parsed = new Date(s);
+          if (!isNaN(parsed)) {
+            tanggal = parsed.getFullYear()+'-'+String(parsed.getMonth()+1).padStart(2,'0')+'-'+String(parsed.getDate()).padStart(2,'0');
+          }
+        }
+      }
+    }
 
     const qty = parseInt(String(qtyRaw).replace(/\D/g, '')) || 0;
     const hargaJual = priceRaw ? (parseInt(String(priceRaw).replace(/\D/g, '')) || null) : null;
-    const r = { _row: idx+2, _status:'valid', _error:'', _book:null, _checked:true, barcode, qty, harga_jual:hargaJual, tanggal:tanggal||null, catatan:catatan||'' };
+    const r = { _row: idx+2, _status:'valid', _error:'', _book:null, _checked:true, barcode, qty, harga_jual:hargaJual, tanggal:tanggal, catatan:catatan||'' };
 
     if (!barcode) { r._status='error'; r._error='Barcode kosong'; r._checked=false; return r; }
     const entry = stockTracker[barcode];
