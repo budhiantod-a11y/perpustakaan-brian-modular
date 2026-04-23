@@ -69,10 +69,10 @@ export function renderManualSaleModal() {
                 style="width:110px;font-size:13px;padding:4px 8px;${isDiskon ? 'border-color:var(--orange)' : 'border-color:var(--accent)'}">
               <span class="price-diff-pill ${diffClass}" id="manual-diff-${idx}">${diffText}</span>
             </div>
-            <div id="manual-note-wrap-${idx}" style="width:100%;display:${isDiskon ? 'block' : 'none'}">
+            <div id="manual-note-wrap-${idx}" style="width:100%">
               <input class="inp" type="text" id="manual-note-${idx}"
                 value="${(item.note||'').replace(/"/g,'&quot;')}"
-                placeholder="Catatan diskon (wajib)..."
+                placeholder="${isDiskon ? 'Catatan diskon (wajib)...' : 'Catatan (opsional)...'}"
                 oninput="manualCartUpdateNote(${idx},this.value)"
                 style="font-size:12px;padding:4px 8px;width:100%;box-sizing:border-box">
             </div>
@@ -172,14 +172,14 @@ export function manualCartUpdatePrice(idx, val) {
   const diff = item.finalPrice - normalP;
   const diffEl = document.getElementById(`manual-diff-${idx}`);
   const priceEl = document.getElementById(`manual-price-${idx}`);
-  const noteWrapEl = document.getElementById(`manual-note-wrap-${idx}`);
+  const noteEl = document.getElementById(`manual-note-${idx}`);
   if (diffEl) {
     if (diff < 0)      { diffEl.textContent = fmt(diff);     diffEl.className = 'price-diff-pill diff-down'; }
     else if (diff > 0) { diffEl.textContent = '+'+fmt(diff); diffEl.className = 'price-diff-pill diff-up'; }
     else               { diffEl.textContent = '—';           diffEl.className = 'price-diff-pill diff-same'; }
   }
   if (priceEl) priceEl.style.borderColor = diff !== 0 ? 'var(--orange)' : 'var(--accent)';
-  if (noteWrapEl) noteWrapEl.style.display = diff !== 0 ? 'block' : 'none';
+  if (noteEl)  noteEl.placeholder = diff !== 0 ? 'Catatan diskon (wajib)...' : 'Catatan (opsional)...';
 }
 
 export function manualCartUpdateNote(idx, val) {
