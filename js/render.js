@@ -344,10 +344,10 @@ export function render() {
               </div>
               <div class="book-actions">
                 <span class="badge ${stock<=5?'badge-red':'badge-green'}" style="font-size:12px;padding:4px 10px">${stock} pcs</span>
-                <button class="btn btn-ghost btn-sm" onclick="openEditBook(${b.id})">Edit</button>
-                <button class="btn btn-green btn-sm" onclick="openAddRestock(${b.id})">+ Restock</button>
-                <button class="btn btn-ghost btn-sm" onclick="openStokOpname(${b.id})" style="color:var(--amber);border-color:var(--amber-s)">📋 Opname</button>
-                <button class="btn btn-danger btn-sm" onclick="deleteBook(${b.id})">Hapus</button>
+                <button class="btn btn-ghost btn-sm" onclick='openEditBook(${JSON.stringify(b.id)})'>Edit</button>
+                <button class="btn btn-green btn-sm" onclick='openAddRestock(${JSON.stringify(b.id)})'>+ Restock</button>
+                <button class="btn btn-ghost btn-sm" onclick='openStokOpname(${JSON.stringify(b.id)})' style="color:var(--amber);border-color:var(--amber-s)">📋 Opname</button>
+                <button class="btn btn-danger btn-sm" onclick='deleteBook(${JSON.stringify(b.id)})'>Hapus</button>
               </div>
             </div>
             ${active.length ? `
@@ -426,10 +426,10 @@ export function render() {
                   <div style="font-size:11px;color:var(--text3)">HPP FIFO: ${fmt(Math.round(cogs/item.qty))}/pcs · Stok: ${totalStock(item.book)}</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px">
-                  <button class="btn btn-ghost btn-xs" onclick="changeScanBundleQty(${item.bookId},-1)">−</button>
+                  <button class="btn btn-ghost btn-xs" onclick='changeScanBundleQty(${JSON.stringify(item.bookId)},-1)'>−</button>
                   <span style="font-weight:700;min-width:20px;text-align:center">${item.qty}</span>
-                  <button class="btn btn-ghost btn-xs" onclick="changeScanBundleQty(${item.bookId},+1)">+</button>
-                  <button class="btn btn-danger btn-xs" style="margin-left:4px" onclick="removeScanBundleItem(${item.bookId})">✕</button>
+                  <button class="btn btn-ghost btn-xs" onclick='changeScanBundleQty(${JSON.stringify(item.bookId)},+1)'>+</button>
+                  <button class="btn btn-danger btn-xs" style="margin-left:4px" onclick='removeScanBundleItem(${JSON.stringify(item.bookId)})'>✕</button>
                 </div>
               </div>`;
             }).join('')}

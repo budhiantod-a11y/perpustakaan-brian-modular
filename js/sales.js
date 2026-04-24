@@ -127,7 +127,7 @@ export function manualCartSearchFilter(query) {
   resultsEl.innerHTML = matches.map(b => `
     <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"
       onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
-      onclick="manualCartAddById(${b.id})">
+      onclick='manualCartAddById(${JSON.stringify(b.id)})'>
       <div>
         <div style="font-weight:600;font-size:13px">${b.title}</div>
         <div style="font-size:11px;color:var(--text3)">Stok: ${totalStock(b)} · ${fmt(getNormalPrice(b))}</div>
@@ -540,7 +540,7 @@ export function bundleSearchFilter(query) {
   resultsEl.innerHTML = matches.map(b => `
     <div style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center"
       onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
-      onclick="bundleAddById(${b.id})">
+      onclick='bundleAddById(${JSON.stringify(b.id)})'>
       <div>
         <div style="font-weight:600;font-size:13px">${b.title}</div>
         <div style="font-size:11px;color:var(--text3)">Stok: ${totalStock(b)} · ${fmt(getNormalPrice(b))}</div>
