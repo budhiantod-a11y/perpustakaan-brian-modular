@@ -190,7 +190,7 @@ export async function loadFromSheets() {
         batches: (b.batches||[]).map(bt => ({ ...bt, id: num(bt.id)||bt.id, qty: num(bt.qty), remaining: num(bt.remaining), buyPrice: num(bt.buyPrice), date: fixDate(bt.date) })),
       }));
       sales = (json.data.sales||[]).map(s => ({
-        ...s, id: num(s.id)||s.id, bookId: s.bookId ? num(s.bookId) : null,
+        ...s, id: num(s.id)||s.id, bookId: s.bookId ? (num(s.bookId)||s.bookId) : null,
         qty: num(s.qty), buyPrice: num(s.buyPrice), normalPrice: num(s.normalPrice), sellPrice: num(s.sellPrice),
         finalPrice: num(s.finalPrice), finalSellPrice: num(s.finalSellPrice), cogs: num(s.cogs), profit: num(s.profit),
         priceOverride: s.priceOverride===true||s.priceOverride==='TRUE'||s.priceOverride==='true'||(!!(s.bundleId)?false:(num(s.normalPrice)>0&&num(s.finalPrice)!==num(s.normalPrice))),
@@ -250,7 +250,7 @@ export async function fetchFromSheetsOnBoot() {
       const sheetSales = (json.data.sales||[]).map(s => ({
         ...s,
         id: num(s.id)||s.id,
-        bookId: s.bookId ? num(s.bookId) : null,
+        bookId: s.bookId ? (num(s.bookId)||s.bookId) : null,
         qty: num(s.qty),
         buyPrice: num(s.buyPrice),
         normalPrice: num(s.normalPrice),

@@ -171,3 +171,39 @@ window.executeRepair = function (opts = {}) {
   console.log(`Batch IDs dedup'd:    ${batchIdsReassigned}`);
   console.log('\nLocal save done. Sheets sync triggered — watch the sync indicator. After it completes, hard-refresh the app and spot-check.');
 };
+
+// ─── Orphan recovery ───────────────────────────────────────────────────────
+// Single-item sales whose bookId was lost (e.g. from the state.js num() bug
+// that turned string bookIds into NaN → null on Sheets round-trip).
+// Recover by matching bookTitle → book.id.
+window.previewOrphanSales = function () {
+  const orphans = S.sales.filter(s => !s.isBundle && !s.bookId && s.bookTitle);
+  console.log('%c=== ORPHAN SALES PREVIEW ===', 'font-weight:bold;color:#7c3aed');
+  console.log(`Single-item sales with empty bookId: ${orphans.length}`);
+  const resolvable = [], unresolvable = [];
+  for (const s of orphans) {
+    const matches = S.books.filter(b => b.title === s.bookTitle);
+    if (matches.length === 1) resolvable.push({ sale: s, book: matches[0] });
+    else unresolvable.push({ sale: s, matchCount: matches.length });
+  }
+  console.log(`  ├─ Resolvable (exact title match, 1 book): ${resolvable.length}`);
+  console.log(`  └─ Unresolvable (0 or >1 books match title): ${unresolvable.length}`);
+  if (resolvable.length) {
+    console.log('\n--- Resolvable ---');
+    resolvable.forEach(({ sale, book }) => console.log(`  sale=${sale.id} date=${sale.date} "${sale.bookTitle}" → book.id=${book.id}`));
+  }
+  if (unresolvable.length) {
+    console.log('\n--- ⚠️ Unresolvable ---');
+    unresolvable.forEach(({ sale, matchCount }) => console.log(`  sale=${sale.id} date=${sale.date} "${sale.bookTitle}" → ${matchCount} book matches`));
+  }
+  return { resolvable, unresolvable };
+};
+
+window.executeOrphanSales = function () {
+  const { resolvable, unresolvable } = window.previewOrphanSales();
+  if (!resolvable.length) { console.log('Nothing to repair.'); return; }
+  for (const { sale, book } of resolvable) sale.bookId = book.id;
+  S.save();
+  console.log(`%c✓ Repointed ${resolvable.length} orphan sales. Sync triggered.`, 'color:#16a34a;font-weight:bold');
+  if (unresolvable.length) console.log(`⚠️ ${unresolvable.length} still unresolvable — handle manually.`);
+};
