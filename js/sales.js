@@ -81,9 +81,15 @@ export function renderManualSaleModal() {
       }).join('')}
     </div>
 
-    <div class="field" style="margin-bottom:4px">
-      <label>Tanggal</label>
-      <input class="inp" id="manual-cart-date" type="date" value="${today()}" max="${today()}" style="max-width:180px">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+      <div class="field" style="flex:0 0 180px">
+        <label>Tanggal</label>
+        <input class="inp" id="manual-cart-date" type="date" value="${today()}" max="${today()}">
+      </div>
+      <div class="field" style="flex:1;min-width:200px">
+        <label>Customer <span style="color:var(--text3);font-weight:400">(opsional)</span></label>
+        <input class="inp" id="manual-cart-customer" type="text" placeholder="Nama customer" autocomplete="off">
+      </div>
     </div>` : `
     <div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;background:var(--bg);border-radius:var(--radius-s);margin-bottom:16px">
       Belum ada buku dipilih.<br>Ketik judul buku di atas untuk menambahkan.
@@ -237,6 +243,7 @@ export function saveSaleManual() {
   const items = S.manualCartItems;
   if (!items.length) { showToast('Tambahkan minimal 1 buku', 'err'); return; }
   const date = document.getElementById('manual-cart-date')?.value || today();
+  const customer = document.getElementById('manual-cart-customer')?.value?.trim() || '';
 
   // Read latest DOM values into state before validating (handles fast typing edge cases)
   for (let idx = 0; idx < items.length; idx++) {
@@ -281,6 +288,7 @@ export function saveSaleManual() {
       date, via: 'manual',
       priceOverride: isDiskon,
       note: item.note || '',
+      customer,
       ...(groupId ? { groupId } : {}),
     });
   }

@@ -196,6 +196,7 @@ export async function loadFromSheets() {
         priceOverride: s.priceOverride===true||s.priceOverride==='TRUE'||s.priceOverride==='true'||(!!(s.bundleId)?false:(num(s.normalPrice)>0&&num(s.finalPrice)!==num(s.normalPrice))),
         isBundle: s.isBundle===true||s.isBundle==='TRUE'||s.isBundle==='true'||!!(s.bundleId),
         date: fixDate(s.date),
+        customer: String(s.customer || ''),
         bundleItems: (s.bundleItems||[]).map(i => ({ ...i, bookId: num(i.bookId)||i.bookId, qty: num(i.qty), cogs: num(i.cogs), buyPrice: num(i.buyPrice) })),
       }));
       restocks  = (json.data.restocks||[]).map(r => ({
@@ -262,6 +263,7 @@ export async function fetchFromSheetsOnBoot() {
         priceOverride: s.priceOverride === true || s.priceOverride === 'TRUE' || s.priceOverride === 'true' || (!!(s.bundleId) ? false : (num(s.normalPrice) > 0 && num(s.finalPrice) !== num(s.normalPrice))),
         isBundle: s.isBundle === true || s.isBundle === 'TRUE' || s.isBundle === 'true' || !!(s.bundleId),
         date: fixDate(s.date),
+        customer: String(s.customer || ''),
         bundleItems: (s.bundleItems||[]).map(i => ({
           ...i,
           bookId: num(i.bookId)||i.bookId,
