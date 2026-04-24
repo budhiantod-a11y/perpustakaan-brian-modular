@@ -95,7 +95,7 @@ export function openEditBook(bookId) {
     </div>` : ''}
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary" onclick="updateBook(${bookId})">Simpan</button>
+      <button class="btn btn-primary" onclick='updateBook(${JSON.stringify(bookId)})'>Simpan</button>
     </div>`);
 }
 
@@ -158,7 +158,7 @@ export function openAddRestock(bookId) {
     <div class="field hint" style="margin-top:-6px">Batch baru ini akan otomatis masuk antrian FIFO terbaru</div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-      <button class="btn btn-green" onclick="saveRestock(${bookId})">Tambah Restock</button>
+      <button class="btn btn-green" onclick='saveRestock(${JSON.stringify(bookId)})'>Tambah Restock</button>
     </div>`);
 }
 
@@ -225,7 +225,7 @@ export function openStokOpname(bookId) {
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-      <button class="btn btn-primary" onclick="saveStokOpname(${bookId})">Simpan Opname</button>
+      <button class="btn btn-primary" onclick='saveStokOpname(${JSON.stringify(bookId)})'>Simpan Opname</button>
     </div>`);
   // Live preview
   const inp = document.getElementById('f_opname_qty');

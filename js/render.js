@@ -775,7 +775,7 @@ export function render() {
                       <td style="color:var(--green);font-weight:600;white-space:nowrap">${fmt(x.profit)}</td>
                       <td><span class="badge badge-gray">${x.via}</span></td>
                       <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.note||'—'}</td>
-                      <td><button class="btn btn-danger btn-xs" onclick="deleteSaleBundle(${x.id})">Hapus</button></td>
+                      <td><button class="btn btn-danger btn-xs" onclick='deleteSaleBundle(${JSON.stringify(x.id)})'>Hapus</button></td>
                     </tr>`;
                 }
                 return `
@@ -790,7 +790,7 @@ export function render() {
                     <td style="color:var(--green);font-weight:600;white-space:nowrap">${fmt(x.profit)}</td>
                     <td><span class="badge ${x.via==='scan'?'badge-accent':'badge-gray'}">${x.via}</span></td>
                     <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.note||'—'}</td>
-                    <td><button class="btn btn-danger btn-xs" onclick="deleteSale(${x.id})" title="Hapus transaksi & kembalikan stok">Hapus</button></td>
+                    <td><button class="btn btn-danger btn-xs" onclick='deleteSale(${JSON.stringify(x.id)})' title="Hapus transaksi & kembalikan stok">Hapus</button></td>
                   </tr>`;
               }).join('')}
             </tbody>
@@ -822,7 +822,7 @@ export function render() {
                   <td><span class="badge badge-blue">+${x.qty}</span></td>
                   <td>${fmt(x.buyPrice)}</td>
                   <td style="font-weight:600">${fmt(x.qty*x.buyPrice)}</td>
-                  <td><button class="btn btn-danger btn-xs" onclick="deleteRestock(${x.id})">Hapus</button></td>
+                  <td><button class="btn btn-danger btn-xs" onclick='deleteRestock(${JSON.stringify(x.id)})'>Hapus</button></td>
                 </tr>`).join('')}
             </tbody>
           </table>
