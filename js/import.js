@@ -176,22 +176,22 @@ export function commitImport() {
 export function downloadBulkSalesTemplate() {
   if (window.XLSX) {
     const ws = window.XLSX.utils.aoa_to_sheet([
-      ['barcode','qty','harga_jual','tanggal','catatan'],
-      ['9789799225589', 2, 45000, '2026-04-20', 'diskon event'],
-      ['9789799222367', 1, '',    '2026-04-20', ''],
-      ['9786024125356', 3, 85000, '2026-04-20', 'promo bundel'],
+      ['barcode','qty','harga_jual','tanggal','catatan','customer'],
+      ['9789799225589', 2, 45000, '2026-04-20', 'diskon event', 'Budi Santoso'],
+      ['9789799222367', 1, '',    '2026-04-20', '',             'Budi Santoso'],
+      ['9786024125356', 3, 85000, '2026-04-20', 'promo bundel', 'Ani 2'],
     ]);
-    ws['!cols'] = [18, 8, 14, 14, 24].map(w => ({ wch: w }));
+    ws['!cols'] = [18, 8, 14, 14, 24, 20].map(w => ({ wch: w }));
     const wb = window.XLSX.utils.book_new();
     window.XLSX.utils.book_append_sheet(wb, ws, 'Penjualan');
     window.XLSX.writeFile(wb, 'template-bulk-penjualan.xlsx');
     showToast('Template Excel (.xlsx) didownload ✓');
   } else {
-    const headers = ['barcode','qty','harga_jual','tanggal','catatan'];
+    const headers = ['barcode','qty','harga_jual','tanggal','catatan','customer'];
     const examples = [
-      ['9789799225589','2','45000','2026-04-20','diskon event'],
-      ['9789799222367','1','','2026-04-20',''],
-      ['9786024125356','3','85000','2026-04-20','promo bundel'],
+      ['9789799225589','2','45000','2026-04-20','diskon event','Budi Santoso'],
+      ['9789799222367','1','','2026-04-20','','Budi Santoso'],
+      ['9786024125356','3','85000','2026-04-20','promo bundel','Ani 2'],
     ];
     const csv = [headers.join(','), ...examples.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
     const a = document.createElement('a');
@@ -259,6 +259,7 @@ function buildBulkSalesRows(rawHeaders, dataRows) {
     harga_jual: rawHeaders.indexOf('harga_jual'),
     tanggal:    rawHeaders.indexOf('tanggal'),
     catatan:    rawHeaders.indexOf('catatan'),
+    customer:   rawHeaders.indexOf('customer'),
   };
   if (COL.barcode < 0 || COL.qty < 0) {
     showToast('Kolom wajib tidak ditemukan: barcode, qty', 'err'); return null;
@@ -271,6 +272,7 @@ function buildBulkSalesRows(rawHeaders, dataRows) {
     const getRaw = col => col >= 0 ? cells[col] : '';
     const barcode = get(COL.barcode), qtyRaw = get(COL.qty), priceRaw = get(COL.harga_jual);
     const catatan = get(COL.catatan);
+    const customer = get(COL.customer);
     if (!barcode && !qtyRaw) return null;
 
     // ── Fix tanggal: handle Excel serial number, Date object, string ──
@@ -300,7 +302,7 @@ function buildBulkSalesRows(rawHeaders, dataRows) {
 
     const qty = parseInt(String(qtyRaw).replace(/\D/g, '')) || 0;
     const hargaJual = priceRaw ? (parseInt(String(priceRaw).replace(/\D/g, '')) || null) : null;
-    const r = { _row: idx+2, _status:'valid', _error:'', _book:null, _checked:true, barcode, qty, harga_jual:hargaJual, tanggal:tanggal, catatan:catatan||'' };
+    const r = { _row: idx+2, _status:'valid', _error:'', _book:null, _checked:true, barcode, qty, harga_jual:hargaJual, tanggal:tanggal, catatan:catatan||'', customer:customer||'' };
 
     if (!barcode) { r._status='error'; r._error='Barcode kosong'; r._checked=false; return r; }
     const entry = stockTracker[barcode];
@@ -334,6 +336,19 @@ export function processBulkSales() {
   const stockCheck = {};
   S.books.forEach(b => { if (b.barcode) stockCheck[b.barcode] = { book: b, available: totalStock(b) }; });
 
+  // Pre-pass: count customer name occurrences (case-insensitive, trimmed).
+  // Customer yang muncul > 1x di batch ini → assign satu groupId bareng.
+  const custCount = {};
+  for (const row of toProcess) {
+    const key = (row.customer || '').toLowerCase().trim();
+    if (!key) continue;
+    custCount[key] = (custCount[key] || 0) + 1;
+  }
+  const custGroupId = {};
+  Object.keys(custCount).forEach(key => {
+    if (custCount[key] > 1) custGroupId[key] = 'mg_' + uid();
+  });
+
   const processed = [], skipped = [];
   for (const row of toProcess) {
     const entry = stockCheck[row.barcode];
@@ -346,12 +361,17 @@ export function processBulkSales() {
     const profit = row.qty * finP - cogs;
     entry.available -= row.qty;
 
+    const custKey = (row.customer || '').toLowerCase().trim();
+    const groupId = custKey ? custGroupId[custKey] : null;
+
     S.sales.push({
       id: uid(), bookId: book.id, bookTitle: book.title, qty: row.qty,
       buyPrice: Math.round(cogs / row.qty), normalPrice: normalP, sellPrice: normalP,
       finalPrice: finP, finalSellPrice: finP, cogs, profit, date,
       via: 'bulk', priceOverride: isDiskon,
       note: note || (isDiskon ? 'bulk upload (harga event)' : 'bulk upload'),
+      customer: row.customer || '',
+      ...(groupId ? { groupId } : {}),
     });
     processed.push({ row: row._row, title: book.title, qty: row.qty });
   }

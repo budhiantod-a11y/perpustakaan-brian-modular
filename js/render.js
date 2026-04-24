@@ -635,6 +635,7 @@ export function render() {
               <code style="background:var(--bg);padding:1px 5px;border-radius:3px">harga_jual</code>
               <code style="background:var(--bg);padding:1px 5px;border-radius:3px">tanggal</code>
               <code style="background:var(--bg);padding:1px 5px;border-radius:3px">catatan</code>
+              <code style="background:var(--bg);padding:1px 5px;border-radius:3px">customer</code>
             </div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="downloadBulkSalesTemplate()">↓ Download Template (.xlsx)</button>
@@ -682,13 +683,23 @@ export function render() {
               <thead><tr>
                 <th style="width:32px"></th>
                 <th>Barcode</th><th>Judul</th><th>Qty</th>
-                <th>Harga Jual</th><th>Tanggal</th><th>Status</th>
+                <th>Harga Jual</th><th>Tanggal</th><th>Customer</th><th>Status</th>
               </tr></thead>
               <tbody>
-                ${bsRows.map((r,i) => {
+                ${(() => {
+                  // Pre-compute grouped customer keys (count > 1 among checked+valid)
+                  // for visual hint in preview — mirrors processBulkSales logic.
+                  const cnt = {};
+                  bsRows.filter(r => r._checked && r._status !== 'error').forEach(r => {
+                    const k = (r.customer||'').toLowerCase().trim();
+                    if (k) cnt[k] = (cnt[k]||0) + 1;
+                  });
+                  return bsRows.map((r,i) => {
                   const book = r._book;
                   const normalP = book ? getNormalPrice(book) : 0;
                   const displayPrice = r.harga_jual || normalP;
+                  const custKey = (r.customer||'').toLowerCase().trim();
+                  const isGrouped = custKey && cnt[custKey] > 1;
                   return `
                   <tr style="cursor:${r._status!=='error'?'pointer':'default'};${r._status==='error'?'opacity:.5':''}" onclick="${r._status!=='error'?`toggleBulkSalesRow(${i})`:''}">
                     <td>
@@ -701,13 +712,15 @@ export function render() {
                     <td>${r.qty}</td>
                     <td>${book ? fmt(displayPrice) : '—'}</td>
                     <td style="font-size:12px;color:var(--text3)">${r.tanggal || today()}</td>
+                    <td style="font-size:12px">${r.customer ? `${r.customer}${isGrouped ? ' <span class="badge" style="font-size:10px;padding:1px 5px;background:#f3e8ff;color:#7c3aed">grup</span>' : ''}` : '<span style="color:var(--text3)">—</span>'}</td>
                     <td>
                       ${r._status==='valid'   ? `<span class="badge badge-green">✓ Valid</span>` : ''}
                       ${r._status==='warning' ? `<span class="badge badge-orange">⚠ ${r._error}</span>` : ''}
                       ${r._status==='error'   ? `<span class="badge badge-red">${r._error}</span>` : ''}
                     </td>
                   </tr>`;
-                }).join('')}
+                }).join('');
+                })()}
               </tbody>
             </table>
           </div>
