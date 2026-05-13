@@ -280,15 +280,28 @@ function renderComparisonTable() {
 
   const nonEmpty = rows.filter(r => !r.empty);
   const cnt = nonEmpty.length;
-  const avgEmpty = cnt === 0;
-  const avg = avgEmpty ? null : {
-    revenue:     nonEmpty.reduce((s, r) => s + r.revenue,     0) / cnt,
-    profit:      nonEmpty.reduce((s, r) => s + r.profit,      0) / cnt,
+  const allEmpty = cnt === 0;
+
+  // Sum: kumulatif 6 bulan. Margin & Shopee% di-recompute dari total (bukan rata2 persentase).
+  const sumRevenue       = rows.reduce((s, r) => s + r.revenue, 0);
+  const sumProfit        = rows.reduce((s, r) => s + r.profit,  0);
+  const sumUnits         = rows.reduce((s, r) => s + r.units,   0);
+  const sumShopeeRevenue = rows.reduce((s, r) => s + r.shopeeRevenue, 0);
+  const sum = allEmpty ? null : {
+    revenue:     sumRevenue,
+    profit:      sumProfit,
+    margin:      sumRevenue > 0 ? (sumProfit / sumRevenue) * 100 : 0,
+    units:       sumUnits,
+    shopeeShare: sumRevenue > 0 ? (sumShopeeRevenue / sumRevenue) * 100 : 0,
+  };
+  const avg = allEmpty ? null : {
+    revenue:     sumRevenue / cnt,
+    profit:      sumProfit  / cnt,
     margin:      nonEmpty.reduce((s, r) => s + r.margin,      0) / cnt,
-    units:       nonEmpty.reduce((s, r) => s + r.units,       0) / cnt,
+    units:       sumUnits   / cnt,
     shopeeShare: nonEmpty.reduce((s, r) => s + r.shopeeShare, 0) / cnt,
   };
-  const best = avgEmpty ? null : {
+  const best = allEmpty ? null : {
     revenue:     Math.max(...rows.map(r => r.revenue)),
     profit:      Math.max(...rows.map(r => r.profit)),
     margin:      Math.max(...rows.map(r => r.margin)),
@@ -329,6 +342,7 @@ function renderComparisonTable() {
         </thead>
         <tbody>
           ${display.map(cellMonth).join('')}
+          ${cellAgg('Sum',     sum)}
           ${cellAgg('Average', avg)}
           ${cellAgg('Best',    best)}
         </tbody>
