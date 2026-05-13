@@ -5,6 +5,7 @@ import * as S from './state.js';
 import { fmt, today, getNormalPrice, allPubs, allCats } from './helpers.js';
 import { totalStock, fifoSim } from './fifo.js';
 import { getPoStatus, getPoTotal, getStatusLabel } from './preorder.js';
+import * as Laporan from './laporan.js';
 
 export function render() {
   const lowStock = S.books.filter(b => totalStock(b) <= 5);
@@ -831,146 +832,8 @@ export function render() {
 
   // ── LAPORAN ────────────────────────────────────────────────────────────────
   if (S.currentTab === 'laporan') {
-    // Bundle data
-    const bundles = filtered.filter(s => s.isBundle);
-
-    // Profit per buku dari penjualan satuan
-    const profitByBook = S.books.map(b => {
-      const bs = filtered.filter(s => s.bookId===b.id && !s.isBundle);
-      const rev  = bs.reduce((s,x) => s+x.qty*(x.finalPrice||x.finalSellPrice||0), 0);
-      const cogs = bs.reduce((s,x) => s+x.cogs, 0);
-      // Tambahkan kontribusi dari bundling (HPP per buku dalam bundle)
-      const bundleSales = filtered.filter(s => s.isBundle && s.bundleItems?.some(i=>i.bookId===b.id));
-      const bundleQty   = bundleSales.reduce((s,x) => s + (x.bundleItems?.find(i=>i.bookId===b.id)?.qty||0), 0);
-      const bundleCogs  = bundleSales.reduce((s,x) => s + (x.bundleItems?.find(i=>i.bookId===b.id)?.cogs||0), 0);
-      return { ...b, revenue:rev, profit:rev-cogs, unitsSold:bs.reduce((s,x)=>s+x.qty,0)+bundleQty, bundleQty, bundleCogs };
-    }).sort((a,b) => b.profit-a.profit);
-    // Bundle summary
-    const bundleSummary = bundles.reduce((acc, x) => {
-      acc.count++;
-      acc.revenue += x.finalPrice||x.finalSellPrice||0;
-      acc.cogs    += x.cogs||0;
-      acc.profit  += x.profit||0;
-      acc.qty     += x.qty||0;
-      return acc;
-    }, { count:0, revenue:0, cogs:0, profit:0, qty:0 });
-    const maxP = Math.max(...profitByBook.map(b=>b.profit), 1);
-    const overrides = filtered.filter(s => s.priceOverride && !s.isBundle);
-
-    area.innerHTML = `
-      <div class="page-hdr">
-        <div><div class="page-title">Laporan Keuangan</div><div class="page-sub">Profit akurat berdasarkan FIFO</div></div>
-        <button class="btn btn-primary" onclick="exportCSV()">↓ Export CSV</button>
-      </div>
-
-      <div class="period-bar">
-        <label>Periode</label>
-        <input type="date" value="${S.period.from}" onchange="setPeriodFrom(this.value)">
-        <span class="period-sep">—</span>
-        <input type="date" value="${S.period.to}" onchange="setPeriodTo(this.value)">
-        <span class="period-count">${filtered.length} transaksi ditemukan</span>
-      </div>
-
-      <div class="stat-grid">
-        <div class="stat-card"><div class="stat-label">Revenue</div><div class="stat-value" style="color:var(--green)">${fmt(totalRev)}</div></div>
-        <div class="stat-card"><div class="stat-label">HPP Total (FIFO)</div><div class="stat-value" style="color:var(--red)">${fmt(totalCOGS)}</div></div>
-        <div class="stat-card"><div class="stat-label">Profit Bersih</div><div class="stat-value" style="color:var(--accent)">${fmt(totalProfit)}</div></div>
-        <div class="stat-card"><div class="stat-label">Margin</div><div class="stat-value" style="color:var(--amber)">${totalRev?Math.round(totalProfit/totalRev*100):0}%</div></div>
-      </div>
-
-      ${bundleSummary.count ? `
-      <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:var(--radius);padding:16px 20px;margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;color:#7c3aed;margin-bottom:12px">📦 Ringkasan Penjualan Bundling (${bundleSummary.count} transaksi)</div>
-        <div class="stat-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-          <div class="stat-card" style="border-color:#e9d5ff"><div class="stat-label">Total Buku</div><div class="stat-value" style="font-size:18px;color:#7c3aed">${bundleSummary.qty}</div></div>
-          <div class="stat-card" style="border-color:#e9d5ff"><div class="stat-label">Revenue Bundle</div><div class="stat-value" style="font-size:18px;color:var(--green)">${fmt(bundleSummary.revenue)}</div></div>
-          <div class="stat-card" style="border-color:#e9d5ff"><div class="stat-label">HPP Bundle</div><div class="stat-value" style="font-size:18px;color:var(--red)">${fmt(bundleSummary.cogs)}</div></div>
-          <div class="stat-card" style="border-color:#e9d5ff"><div class="stat-label">Profit Bundle</div><div class="stat-value" style="font-size:18px;color:#7c3aed">${fmt(bundleSummary.profit)}</div></div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Tanggal</th><th>Isi Bundle</th><th>Total Buku</th><th>HPP Modal</th><th>Harga Jual</th><th>Profit</th><th>Catatan</th></tr></thead>
-            <tbody>
-              ${[...bundles].reverse().map(x=>`<tr>
-                <td style="color:var(--text3)">${x.date}</td>
-                <td style="font-size:12px;color:#7c3aed" title="${x.bundleItems?bundleFull(x):x.bookTitle}">${x.bundleItems?bundleShort(x):x.bookTitle}</td>
-                <td>${x.qty}</td>
-                <td style="color:var(--text2)">${fmt(x.cogs||0)}</td>
-                <td style="font-weight:600;color:#7c3aed">${fmt(x.finalPrice||x.finalSellPrice)}</td>
-                <td style="font-weight:600;color:var(--green)">${fmt(x.profit)}</td>
-                <td style="color:var(--text3);font-size:12px">${x.note||'—'}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-      </div>` : ''}
-
-      ${overrides.length ? `
-      <div class="override-section">
-        <div style="font-size:13px;font-weight:700;color:var(--orange);margin-bottom:12px">⬦ Transaksi Harga Diskon / Custom (${overrides.length})</div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty</th><th>Modal/pcs</th><th>Harga Final</th><th>Selisih vs Normal</th><th>Catatan</th></tr></thead>
-            <tbody>
-              ${[...overrides].reverse().map(x => {
-                const normP = x.normalPrice||x.sellPrice||0;
-                const finP  = x.finalPrice||x.finalSellPrice||0;
-                const diff  = x.qty*(finP-normP);
-                return `<tr>
-                  <td style="color:var(--text3)">${x.date}</td>
-                  <td style="font-weight:600">${x.bookTitle}</td>
-                  <td>${x.qty}</td>
-                  <td style="color:var(--text2);font-size:12px">${fmt(x.buyPrice||Math.round((x.cogs||0)/(x.qty||1)))}</td>
-                  <td style="color:var(--orange);font-weight:600">${fmt(finP)}</td>
-                  <td style="font-weight:600;color:${diff<0?'var(--red)':'var(--green)'}">${diff>=0?'+':''}${fmt(diff)} (${fmt(normP)} normal)</td>
-                  <td style="color:var(--text3);font-size:12px">${x.note||'—'}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
-      </div>` : ''}
-
-      <div class="card">
-        <div class="card-title">Profit per Judul Buku</div>
-        ${profitByBook.filter(b=>b.unitsSold>0).length===0
-          ? `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px">Tidak ada penjualan di periode ini</div>`
-          : profitByBook.filter(b=>b.unitsSold>0).map(b=>`
-            <div style="margin-bottom:16px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:4px">
-                <div>
-                  <span style="font-weight:600;font-size:13px">${b.title}</span>
-                  ${b.publisher?`<span class="badge badge-blue" style="font-size:10px;margin-left:6px">${b.publisher}</span>`:''}
-                </div>
-                <div style="display:flex;gap:12px;align-items:center">
-                  <span style="font-size:12px;color:var(--text3)">${b.unitsSold} terjual</span>
-                  <span style="font-weight:700;color:var(--green)">${fmt(b.profit)}</span>
-                </div>
-              </div>
-              <div class="profit-bar-wrap">
-                <div class="profit-bar-fill" style="width:${Math.max((b.profit/maxP)*100,2)}%"></div>
-              </div>
-            </div>`).join('')}
-      </div>
-
-      ${filtered.length > 0 ? `
-      <div class="card">
-        <div class="card-title">Detail Transaksi Periode Ini</div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Tanggal</th><th>Buku</th><th>Qty</th><th>Harga Final</th><th>Revenue</th><th>HPP Modal</th><th>Profit</th></tr></thead>
-            <tbody>
-              ${filtered.map(x=>`
-                <tr>
-                  <td style="color:var(--text3)">${x.date}</td>
-                  <td style="font-weight:600">${x.bookTitle}</td>
-                  <td>${x.qty}</td>
-                  <td>${x.priceOverride?`<strong style="color:var(--orange)">${fmt(x.finalPrice||x.finalSellPrice)}</strong>`:fmt(x.finalPrice||x.finalSellPrice)}</td>
-                  <td>${fmt(x.qty*(x.finalPrice||x.finalSellPrice||0))}</td>
-                  <td style="color:var(--text2)">${fmt(x.cogs)}</td>
-                  <td style="font-weight:600;color:var(--green)">${fmt(x.profit)}</td>
-                </tr>`).join('')}
-            </tbody>
-          </table>
-      </div>` : ''}`;
+    Laporan.renderInto(area);
+    return;
   }
 
   // ── PREORDER ───────────────────────────────────────────────────────────────

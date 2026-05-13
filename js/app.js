@@ -17,6 +17,7 @@ import * as Import   from './import.js';
 import * as Sync     from './sync.js';
 import * as Preorder from './preorder.js';
 import * as Cashflow from './cashflow.js';
+import * as Laporan  from './laporan.js';
 
 // ── Initialize modules with render callback ──────────────────────────────────
 Books.init(render);
@@ -233,6 +234,11 @@ Object.assign(window, {
   cfSetType:         Cashflow.cfSetType,
   cfOnCategoryChange:Cashflow.cfOnCategoryChange,
   cfOnAdvanceChange: Cashflow.cfOnAdvanceChange,
+
+  // Laporan dashboard
+  laporanSetMonth:  Laporan.setMonth,
+  laporanSetRange:  Laporan.setTrendRange,
+  laporanSetMetric: Laporan.setTrendMetric,
 
   // Helpers
   closeModal,
