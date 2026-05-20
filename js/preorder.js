@@ -13,7 +13,11 @@ export function getPoStatus(po) {
   const paid  = Number(po.paidAmount) || 0;
   const total = getPoTotal(po);
   if (paid >= total && total > 0) return 'paid';
-  if (po.dueDate && po.dueDate < today() && paid < total) return 'overdue';
+  const td = today();
+  // DP belum dibayar & deadline DP lewat
+  if (po.dpDueDate && paid === 0 && po.dpDueDate < td) return 'overdue';
+  // Pelunasan belum tuntas & deadline pelunasan lewat
+  if (po.dueDate && po.dueDate < td && paid < total) return 'overdue';
   if (paid > 0 && paid < total) return 'partial';
   return 'unpaid';
 }
@@ -60,9 +64,10 @@ export function openAddPreorder() {
       ${field('Tgl Open PO',  inp('type="date" id="po-open-date" value="' + today() + '"'))}
       ${field('Tgl Close PO', inp('type="date" id="po-close-date"'))}
     </div>
+    ${field('Tgl Ready Penerbit', inp('type="date" id="po-ready-date"'))}
     <div class="inp-grid-2">
-      ${field('Tgl Ready Penerbit',  inp('type="date" id="po-ready-date"'))}
-      ${field('Deadline Pembayaran', inp('type="date" id="po-due-date"'))}
+      ${field('Deadline Pembayaran DP', inp('type="date" id="po-dp-due-date"'))}
+      ${field('Deadline Pelunasan',     inp('type="date" id="po-due-date"'))}
     </div>
     <div class="field">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -132,14 +137,15 @@ function collectItems() {
 export function savePreorder() {
   _poItemCount = 1;
   const publisher = document.getElementById('po-publisher')?.value.trim();
-  const openDate  = document.getElementById('po-open-date')?.value  || null;
-  const closeDate = document.getElementById('po-close-date')?.value || null;
-  const readyDate = document.getElementById('po-ready-date')?.value || null;
-  const dueDate   = document.getElementById('po-due-date')?.value   || null;
+  const openDate  = document.getElementById('po-open-date')?.value     || null;
+  const closeDate = document.getElementById('po-close-date')?.value    || null;
+  const readyDate = document.getElementById('po-ready-date')?.value    || null;
+  const dpDueDate = document.getElementById('po-dp-due-date')?.value   || null;
+  const dueDate   = document.getElementById('po-due-date')?.value      || null;
   const items     = collectItems();
   if (!publisher) return showToast('Nama penerbit wajib diisi', 'error');
   if (!items.length) return showToast('Tambahkan minimal 1 buku dengan judul, qty, dan harga', 'error');
-  S.preorders.push({ id: uid(), publisher, openDate, closeDate, readyDate, dueDate, items, paidAmount: 0, bookArrived: false });
+  S.preorders.push({ id: uid(), publisher, openDate, closeDate, readyDate, dpDueDate, dueDate, items, paidAmount: 0, bookArrived: false });
   S.save(); closeModal(); showToast('Preorder berhasil dibuat ✓'); _render();
 }
 
@@ -164,9 +170,10 @@ export function openEditPreorder(id) {
       ${field('Tgl Open PO',  inp('type="date" id="po-open-date"  value="' + (po.openDate||'')  + '"'))}
       ${field('Tgl Close PO', inp('type="date" id="po-close-date" value="' + (po.closeDate||'') + '"'))}
     </div>
+    ${field('Tgl Ready Penerbit', inp('type="date" id="po-ready-date" value="' + (po.readyDate||'') + '"'))}
     <div class="inp-grid-2">
-      ${field('Tgl Ready Penerbit',  inp('type="date" id="po-ready-date" value="' + (po.readyDate||'') + '"'))}
-      ${field('Deadline Pembayaran', inp('type="date" id="po-due-date"   value="' + (po.dueDate||'')   + '"'))}
+      ${field('Deadline Pembayaran DP', inp('type="date" id="po-dp-due-date" value="' + (po.dpDueDate||'') + '"'))}
+      ${field('Deadline Pelunasan',     inp('type="date" id="po-due-date"    value="' + (po.dueDate||'')   + '"'))}
     </div>
     <div class="field">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -191,14 +198,15 @@ export function updatePreorder(id) {
   const idx = S.preorders.findIndex(p => String(p.id) === String(id));
   if (idx === -1) return;
   const publisher = document.getElementById('po-publisher')?.value.trim();
-  const openDate  = document.getElementById('po-open-date')?.value  || null;
-  const closeDate = document.getElementById('po-close-date')?.value || null;
-  const readyDate = document.getElementById('po-ready-date')?.value || null;
-  const dueDate   = document.getElementById('po-due-date')?.value   || null;
+  const openDate  = document.getElementById('po-open-date')?.value     || null;
+  const closeDate = document.getElementById('po-close-date')?.value    || null;
+  const readyDate = document.getElementById('po-ready-date')?.value    || null;
+  const dpDueDate = document.getElementById('po-dp-due-date')?.value   || null;
+  const dueDate   = document.getElementById('po-due-date')?.value      || null;
   const items     = collectItems();
   if (!publisher) return showToast('Nama penerbit wajib diisi', 'error');
   if (!items.length) return showToast('Tambahkan minimal 1 buku', 'error');
-  S.preorders[idx] = { ...S.preorders[idx], publisher, openDate, closeDate, readyDate, dueDate, items };
+  S.preorders[idx] = { ...S.preorders[idx], publisher, openDate, closeDate, readyDate, dpDueDate, dueDate, items };
   S.save(); closeModal(); showToast('Preorder diperbarui ✓'); _render();
 }
 

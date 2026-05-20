@@ -916,10 +916,11 @@ export function render() {
           ).join('');
 
           const dateRows = [
-            ['Open PO',          po.openDate],
-            ['Close PO',         po.closeDate],
-            ['Ready Penerbit',   po.readyDate],
-            ['Payment Deadline', po.dueDate],
+            ['Open PO',           po.openDate],
+            ['Close PO',          po.closeDate],
+            ['Ready Penerbit',    po.readyDate],
+            ['Deadline DP',       po.dpDueDate],
+            ['Deadline Pelunasan',po.dueDate],
           ].filter(([,d]) => d);
 
           const expandRow = `

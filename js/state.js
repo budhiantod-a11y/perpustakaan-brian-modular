@@ -63,6 +63,7 @@ function sanitizePreorder(po) {
     openDate:    fixDate(po.openDate),
     closeDate:   fixDate(po.closeDate),
     readyDate:   fixDate(po.readyDate),
+    dpDueDate:   fixDate(po.dpDueDate),
     dueDate:     fixDate(po.dueDate),
     paidAmount:  Number(po.paidAmount) || 0,
     bookArrived: po.bookArrived === true || po.bookArrived === 'TRUE' || po.bookArrived === 'true',
