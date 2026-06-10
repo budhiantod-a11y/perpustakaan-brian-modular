@@ -110,7 +110,8 @@ export function renderManualSaleModal() {
                   <span style="min-width:60px;font-size:11px">${fmt(bt.buyPrice)}/pcs</span>
                   <span style="color:var(--text3);min-width:60px;font-size:11px">sisa ${bt.remaining}</span>
                   <input type="number" min="0" max="${bt.remaining}" value="${qtyVal}"
-                    oninput="manualCartSetBatchQty(${idx}, ${JSON.stringify(bt.id)}, +this.value)"
+                    class="batch-qty-input" data-item-idx="${idx}" data-batch-id="${bt.id}"
+                    oninput="manualCartSetBatchQty(this)"
                     style="width:60px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;margin-left:auto">
                   <span style="font-size:10px;color:var(--text3)">pcs</span>
                 </div>`;
@@ -264,18 +265,19 @@ export function manualCartToggleBatchOverride(idx) {
   renderManualSaleModal();
 }
 
-export function manualCartSetBatchQty(idx, batchId, val) {
-  const item = S.manualCartItems[idx];
+export function manualCartSetBatchQty(el) {
+  const idx     = +el.dataset.itemIdx;
+  const batchId = el.dataset.batchId;
+  const item    = S.manualCartItems[idx];
   if (!item || !Array.isArray(item.batchOverride)) return;
-  const qty = Math.max(0, +val || 0);
+  const qty = Math.max(0, +el.value || 0);
   const existing = item.batchOverride.find(o => o.batchId === batchId);
   if (existing) {
     existing.qty = qty;  // keep entry walau 0, biar field gak hilang & cursor terjaga
   } else if (qty > 0) {
     item.batchOverride.push({ batchId, qty });
   }
-  // Skip full re-render (preserve focus) — submit button validation di-handle saveSaleManual
-  // Cuma update total counter inline kalau ada
+  // Skip full re-render (preserve focus) — update total counter inline
   const total = item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0);
   const counterEl = document.getElementById(`manual-batch-total-${idx}`);
   if (counterEl) {
@@ -342,6 +344,18 @@ export function saveSaleManual() {
     const noteEl  = document.getElementById(`manual-note-${idx}`);
     if (priceEl) items[idx].finalPrice = +priceEl.value || 0;
     if (noteEl)  items[idx].note = noteEl.value?.trim() || '';
+    // Read latest batch qty inputs kalau override aktif
+    if (Array.isArray(items[idx].batchOverride)) {
+      const inputs = document.querySelectorAll(`.batch-qty-input[data-item-idx="${idx}"]`);
+      if (inputs.length) {
+        const rebuilt = [];
+        inputs.forEach(inp => {
+          const qty = Math.max(0, +inp.value || 0);
+          if (qty > 0) rebuilt.push({ batchId: inp.dataset.batchId, qty });
+        });
+        items[idx].batchOverride = rebuilt;
+      }
+    }
   }
 
   // Validate each item
