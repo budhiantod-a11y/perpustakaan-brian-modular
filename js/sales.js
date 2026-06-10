@@ -103,7 +103,7 @@ export function renderManualSaleModal() {
             ${useManual ? `
             <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
               ${activeBatches.map(bt => {
-                const ov = item.batchOverride.find(o => o.batchId === bt.id);
+                const ov = item.batchOverride.find(o => String(o.batchId) === String(bt.id));
                 const qtyVal = ov ? ov.qty : 0;
                 return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 8px;background:var(--bg);border-radius:var(--radius-s)">
                   <span style="color:var(--text3);min-width:74px;font-size:11px">${bt.date || '—'}</span>
@@ -257,7 +257,8 @@ export function manualCartToggleBatchOverride(idx) {
     for (const bt of sorted) {
       if (left <= 0) break;
       const take = Math.min(bt.remaining, left);
-      overrides.push({ batchId: bt.id, qty: take });
+      // Selalu simpan batchId sebagai string biar konsisten dengan dataset.batchId (yang selalu string)
+      overrides.push({ batchId: String(bt.id), qty: take });
       left -= take;
     }
     item.batchOverride = overrides;
@@ -267,11 +268,11 @@ export function manualCartToggleBatchOverride(idx) {
 
 export function manualCartSetBatchQty(el) {
   const idx     = +el.dataset.itemIdx;
-  const batchId = el.dataset.batchId;
+  const batchId = String(el.dataset.batchId);
   const item    = S.manualCartItems[idx];
   if (!item || !Array.isArray(item.batchOverride)) return;
   const qty = Math.max(0, +el.value || 0);
-  const existing = item.batchOverride.find(o => o.batchId === batchId);
+  const existing = item.batchOverride.find(o => String(o.batchId) === batchId);
   if (existing) {
     existing.qty = qty;  // keep entry walau 0, biar field gak hilang & cursor terjaga
   } else if (qty > 0) {

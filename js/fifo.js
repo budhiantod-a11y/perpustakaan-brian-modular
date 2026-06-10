@@ -51,9 +51,12 @@ export function fifoSim(book, qty) {
 export function manualDeduct(bookId, overrides) {
   const book = books.find(b => b.id === bookId);
   if (!book) return { cogs:0, details:[], ok:false, reason:'Buku tidak ditemukan' };
+  // String-compare batchId (data dari Sheets bisa jadi number, dataset selalu string)
+  const findBatch = id => book.batches.find(b => String(b.id) === String(id));
   let cogs = 0, details = [];
   for (const ov of overrides) {
-    const bt = book.batches.find(b => b.id === ov.batchId);
+    if (!ov.qty) continue;  // skip entri qty=0
+    const bt = findBatch(ov.batchId);
     if (!bt)            return { cogs:0, details:[], ok:false, reason:'Batch tidak ditemukan' };
     if (bt.remaining < ov.qty) return { cogs:0, details:[], ok:false, reason:`Batch ${bt.date||'?'} sisa ${bt.remaining} pcs, diminta ${ov.qty}` };
     cogs += ov.qty * bt.buyPrice;
@@ -61,7 +64,8 @@ export function manualDeduct(bookId, overrides) {
   }
   // Semua valid → deduct
   for (const ov of overrides) {
-    const bt = book.batches.find(b => b.id === ov.batchId);
+    if (!ov.qty) continue;
+    const bt = findBatch(ov.batchId);
     bt.remaining -= ov.qty;
   }
   return { cogs, details, ok:true };
@@ -70,7 +74,7 @@ export function manualDeduct(bookId, overrides) {
 export function manualSim(book, overrides) {
   let cogs = 0, details = [], totalQty = 0;
   for (const ov of overrides) {
-    const bt = book.batches.find(b => b.id === ov.batchId);
+    const bt = book.batches.find(b => String(b.id) === String(ov.batchId));
     if (!bt) continue;
     cogs += ov.qty * bt.buyPrice;
     totalQty += ov.qty;
