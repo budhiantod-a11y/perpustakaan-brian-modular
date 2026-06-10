@@ -4,7 +4,7 @@
 
 // ── Core data ────────────────────────────────────────────────────────────────
 export let books = [], sales = [], restocks = [], preorders = [], cashflows = [];
-// Drafts buku — localStorage only, tidak di-sync ke Sheets
+// Drafts buku — sinkron ke Sheets via sheet "Drafts" (biar bisa lanjut di device lain)
 export let drafts = [];
 function localDate() {
   const d = new Date();
@@ -80,6 +80,22 @@ function sanitizePreorder(po) {
   };
 }
 
+function sanitizeDraft(d) {
+  const num = v => Number(v) || 0;
+  return {
+    id:          String(d.id || ''),
+    title:       String(d.title || ''),
+    author:      String(d.author || ''),
+    publisher:   String(d.publisher || ''),
+    category:    String(d.category || ''),
+    barcode:     String(d.barcode || ''),
+    buyPrice:    num(d.buyPrice),
+    normalPrice: num(d.normalPrice),
+    stock:       num(d.stock),
+    updatedAt:   String(d.updatedAt || ''),
+  };
+}
+
 function sanitizeCashflow(cf) {
   const fixDate = d => {
     if (!d || typeof d !== 'string') return null;
@@ -112,7 +128,7 @@ export function load() {
       restocks  = d.restocks  || [];
       preorders = (d.preorders || []).map(sanitizePreorder);
       cashflows = (d.cashflows || []).map(sanitizeCashflow);
-      drafts    = Array.isArray(d.drafts) ? d.drafts : [];
+      drafts    = (Array.isArray(d.drafts) ? d.drafts : []).map(sanitizeDraft);
       period    = d.period    || period;
       return true;
     }
@@ -161,13 +177,13 @@ export async function syncToSheets(showFeedback=false) {
   updateSyncUI('syncing');
   try {
     const res = await fetch(gsUrl, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders, cashflows } }), redirect:'follow' });
+      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders, cashflows, drafts } }), redirect:'follow' });
     const json = JSON.parse(await res.text());
     if (json.ok) { updateSyncUI('connected'); if(showFeedback) console.log('Sync OK'); return; }
     throw new Error(json.error);
   } catch(err) {
     try {
-      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders, cashflows }));
+      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts }));
       const json2 = await (await fetch(`${gsUrl}?action=sync&payload=${enc}`, {redirect:'follow'})).json();
       if (json2.ok) { updateSyncUI('connected'); return; }
     } catch(e2) {}
@@ -208,6 +224,7 @@ export async function loadFromSheets() {
       }));
       preorders = (json.data.preorders||[]).map(sanitizePreorder);
       cashflows = (json.data.cashflows||[]).map(sanitizeCashflow);
+      drafts    = (json.data.drafts||[]).map(sanitizeDraft);
       save(); updateSyncUI('connected'); return true;
     }
   } catch(e) {}
@@ -293,6 +310,9 @@ export async function fetchFromSheetsOnBoot() {
       // Sanitize cashflows
       const sheetCashflows = (json.data.cashflows||[]).map(sanitizeCashflow);
 
+      // Sanitize drafts
+      const sheetDrafts = (json.data.drafts||[]).map(sanitizeDraft);
+
       // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
       if (sheetBooks.length > 0 || sheetSales.length > 0) {
         books     = sheetBooks;
@@ -300,6 +320,7 @@ export async function fetchFromSheetsOnBoot() {
         restocks  = sheetRestocks;
         preorders = sheetPreorders;
         cashflows = sheetCashflows;
+        drafts    = sheetDrafts;
         // Save to localStorage (but scheduleSync is blocked, so won't push back to Sheets)
         try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, period })); }
         catch(e) {}

@@ -1,0 +1,335 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// Perpustakaan Brian — Google Apps Script Backend
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// CARA PAKAI:
+// 1. Buka Google Sheets baru → Extensions → Apps Script
+// 2. Hapus semua kode default, paste seluruh isi file ini
+// 3. Klik Deploy → New Deployment
+//    - Type: Web App
+//    - Execute as: Me
+//    - Who has access: Anyone
+// 4. Copy URL deployment → paste di app Perpustakaan Brian (tombol Google Sheets)
+//
+// Sheets yang akan dibuat otomatis: books, sales, restocks, preorders, cashflows, drafts
+// ═══════════════════════════════════════════════════════════════════════════
+
+function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) || 'ping';
+
+  if (action === 'ping') {
+    return jsonReply({ ok: true, message: 'Perpustakaan Brian — GAS backend ready' });
+  }
+
+  if (action === 'load') {
+    return loadData();
+  }
+
+  // Fallback: sync via GET (untuk browser yang blokir POST CORS)
+  if (action === 'sync' && e.parameter.payload) {
+    try {
+      var payload = JSON.parse(decodeURIComponent(e.parameter.payload));
+      return syncData(payload.data || payload);
+    } catch (err) {
+      return jsonReply({ ok: false, error: 'GET sync parse error: ' + err.message });
+    }
+  }
+
+  return jsonReply({ ok: false, error: 'Unknown action: ' + action });
+}
+
+function doPost(e) {
+  try {
+    var body;
+    if (e.postData && e.postData.contents) {
+      body = JSON.parse(e.postData.contents);
+    } else if (e.parameter && e.parameter.payload) {
+      body = JSON.parse(decodeURIComponent(e.parameter.payload));
+    } else {
+      return jsonReply({ ok: false, error: 'No POST body received' });
+    }
+
+    var action = body.action || 'sync';
+
+    if (action === 'sync') {
+      return syncData(body.data || body);
+    }
+
+    return jsonReply({ ok: false, error: 'Unknown action: ' + action });
+  } catch (err) {
+    return jsonReply({ ok: false, error: 'POST error: ' + err.message });
+  }
+}
+
+// ── SYNC: Simpan data ke sheet ────────────────────────────────────────────
+function syncData(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Sheet "books"
+  writeSheet(ss, 'books', data.books || [], [
+    'id','barcode','title','author','publisher','category',
+    'normalPrice','sellPrice','batches_json'
+  ], function(book) {
+    return [
+      book.id, book.barcode, book.title, book.author || '',
+      book.publisher || '', book.category || '',
+      book.normalPrice || 0, book.sellPrice || 0,
+      JSON.stringify(book.batches || [])
+    ];
+  });
+
+  // Sheet "sales"
+  writeSheet(ss, 'sales', data.sales || [], [
+        'id','bookId','bookTitle','qty','buyPrice','normalPrice','sellPrice',
+        'finalPrice','finalSellPrice','cogs','profit','date','via',
+        'priceOverride','note','customer','isBundle','bundleId','bundleItems_json','groupId'
+      ], function(sale) {
+        return [
+          sale.id, sale.bookId || '', sale.bookTitle, sale.qty,
+          sale.buyPrice || 0, sale.normalPrice || 0, sale.sellPrice || 0,
+          sale.finalPrice || 0, sale.finalSellPrice || 0,
+          sale.cogs || 0, sale.profit || 0, sale.date, sale.via || 'manual',
+          sale.priceOverride ? 'TRUE' : 'FALSE', sale.note || '',
+          sale.customer || '',
+          sale.isBundle ? 'TRUE' : 'FALSE', sale.bundleId || '',
+          JSON.stringify(sale.bundleItems || []), sale.groupId || ''
+        ];
+      });
+
+  // Sheet "restocks"
+  writeSheet(ss, 'restocks', data.restocks || [], [
+    'id','bookId','bookTitle','qty','buyPrice','date','note'
+  ], function(r) {
+    return [
+      r.id, r.bookId, r.bookTitle, r.qty,
+      r.buyPrice || 0, r.date, r.note || ''
+    ];
+  });
+
+  // Sheet "preorders"
+  writeSheet(ss, 'preorders', data.preorders || [], [
+    'id','publisher','openDate','closeDate','readyDate',
+    'dpDueDate','dueDate','paidAmount','bookArrived','lastPayDate','paymentLog_json','items_json'
+  ], function(po) {
+    return [
+      po.id, po.publisher,
+      po.openDate     || '',
+      po.closeDate    || '',
+      po.readyDate    || '',
+      po.dpDueDate    || '',
+      po.dueDate      || '',
+      po.paidAmount   || 0,
+      po.bookArrived  ? 'TRUE' : 'FALSE',
+      po.lastPayDate  || '',
+      JSON.stringify(po.paymentLog || []),
+      JSON.stringify(po.items || [])
+    ];
+  });
+
+  // Sheet "cashflows"
+  writeSheet(ss, 'cashflows', data.cashflows || [], [
+    'id','date','type','category','amount','note','isAdvance','delivered'
+  ], function(cf) {
+    return [
+      cf.id,
+      cf.date       || '',
+      cf.type       || 'income',
+      cf.category   || 'lainnya',
+      cf.amount     || 0,
+      cf.note       || '',
+      cf.isAdvance  ? 'TRUE' : 'FALSE',
+      cf.delivered  ? 'TRUE' : 'FALSE'
+    ];
+  });
+
+  // Sheet "drafts" — draft buku yang belum di-finalisasi
+  // Hanya tulis kalau payload mengandung drafts (biar client lama yg gak kirim drafts gak overwrite jadi kosong)
+  if (data.drafts !== undefined) {
+    writeSheet(ss, 'drafts', data.drafts || [], [
+      'id','title','author','publisher','category','barcode',
+      'buyPrice','normalPrice','stock','updatedAt'
+    ], function(d) {
+      return [
+        d.id,
+        d.title       || '',
+        d.author      || '',
+        d.publisher   || '',
+        d.category    || '',
+        d.barcode     || '',
+        d.buyPrice    || 0,
+        d.normalPrice || 0,
+        d.stock       || 0,
+        d.updatedAt   || ''
+      ];
+    });
+  }
+
+  return jsonReply({
+    ok: true,
+    message: 'Synced '
+      + (data.books      ||[]).length + ' books, '
+      + (data.sales      ||[]).length + ' sales, '
+      + (data.restocks   ||[]).length + ' restocks, '
+      + (data.preorders  ||[]).length + ' preorders, '
+      + (data.cashflows  ||[]).length + ' cashflows, '
+      + (data.drafts     ||[]).length + ' drafts'
+  });
+}
+
+// ── LOAD: Baca data dari sheet ────────────────────────────────────────────
+function loadData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var books = readSheet(ss, 'books', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.id = Number(obj.id) || obj.id;
+    obj.normalPrice = Number(obj.normalPrice) || 0;
+    obj.sellPrice   = Number(obj.sellPrice)   || 0;
+    try { obj.batches = JSON.parse(obj.batches_json || '[]'); } catch(e) { obj.batches = []; }
+    delete obj.batches_json;
+    return obj;
+  });
+
+  var sales = readSheet(ss, 'sales', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.id             = Number(obj.id) || obj.id;
+    obj.bookId         = obj.bookId ? (Number(obj.bookId) || obj.bookId) : null;
+    obj.qty            = Number(obj.qty)            || 0;
+    obj.buyPrice       = Number(obj.buyPrice)       || 0;
+    obj.normalPrice    = Number(obj.normalPrice)    || 0;
+    obj.sellPrice      = Number(obj.sellPrice)      || 0;
+    obj.finalPrice     = Number(obj.finalPrice)     || 0;
+    obj.finalSellPrice = Number(obj.finalSellPrice) || 0;
+    obj.cogs           = Number(obj.cogs)           || 0;
+    obj.profit         = Number(obj.profit)         || 0;
+    obj.priceOverride  = obj.priceOverride === 'TRUE';
+    obj.isBundle       = obj.isBundle === 'TRUE';
+    try { obj.bundleItems = JSON.parse(obj.bundleItems_json || '[]'); } catch(e) { obj.bundleItems = []; }
+    delete obj.bundleItems_json;
+    return obj;
+  });
+
+  var restocks = readSheet(ss, 'restocks', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.id      = Number(obj.id)      || obj.id;
+    obj.bookId  = Number(obj.bookId)  || obj.bookId;
+    obj.qty     = Number(obj.qty)     || 0;
+    obj.buyPrice= Number(obj.buyPrice)|| 0;
+    return obj;
+  });
+
+  var preorders = readSheet(ss, 'preorders', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.paidAmount  = Number(obj.paidAmount) || 0;
+    obj.bookArrived = obj.bookArrived === 'TRUE';
+    obj.openDate    = obj.openDate    || null;
+    obj.closeDate   = obj.closeDate   || null;
+    obj.readyDate   = obj.readyDate   || null;
+    obj.dpDueDate   = obj.dpDueDate   || null;
+    obj.dueDate     = obj.dueDate     || null;
+    obj.lastPayDate = obj.lastPayDate || null;
+    try { obj.paymentLog = JSON.parse(obj.paymentLog_json || '[]'); } catch(e) { obj.paymentLog = []; }
+    delete obj.paymentLog_json;
+    try { obj.items = JSON.parse(obj.items_json || '[]'); } catch(e) { obj.items = []; }
+    obj.items = obj.items.map(function(i) {
+      return {
+        id:          String(i.id || ''),
+        title:       String(i.title || ''),
+        qty:         Number(i.qty) || 0,
+        pricePerPcs: Number(i.pricePerPcs) || 0
+      };
+    });
+    delete obj.items_json;
+    return obj;
+  });
+
+  var cashflows = readSheet(ss, 'cashflows', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.id        = String(obj.id || '');
+    obj.amount    = Number(obj.amount)  || 0;
+    obj.isAdvance = obj.isAdvance === 'TRUE';
+    obj.delivered = obj.delivered === 'TRUE';
+    obj.date      = obj.date      || null;
+    obj.type      = obj.type      || 'income';
+    obj.category  = obj.category  || 'lainnya';
+    obj.note      = obj.note      || '';
+    return obj;
+  });
+
+  var drafts = readSheet(ss, 'drafts', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.id          = String(obj.id || '');
+    obj.title       = obj.title       || '';
+    obj.author      = obj.author      || '';
+    obj.publisher   = obj.publisher   || '';
+    obj.category    = obj.category    || '';
+    obj.barcode     = obj.barcode     || '';
+    obj.buyPrice    = Number(obj.buyPrice)    || 0;
+    obj.normalPrice = Number(obj.normalPrice) || 0;
+    obj.stock       = Number(obj.stock)       || 0;
+    obj.updatedAt   = obj.updatedAt   || '';
+    return obj;
+  });
+
+  return jsonReply({
+    ok: true,
+    data: { books: books, sales: sales, restocks: restocks, preorders: preorders, cashflows: cashflows, drafts: drafts }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+function writeSheet(ss, sheetName, data, headers, rowFn) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+  sheet.clear();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  if (data.length > 0) {
+    var rows = data.map(rowFn);
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  }
+}
+
+function readSheet(ss, sheetName, parseFn) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return [];
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  var headers = data[0];
+  var results = [];
+  for (var i = 1; i < data.length; i++) {
+    results.push(parseFn(data[i], headers));
+  }
+  return results;
+}
+
+function rowToObj(row, headers) {
+  var obj = {};
+  for (var i = 0; i < headers.length; i++) {
+    var val = row[i];
+    // Google Sheets auto-converts date strings to Date objects
+    if (val instanceof Date) {
+      var y = val.getFullYear();
+      var m = ('0' + (val.getMonth()+1)).slice(-2);
+      var d = ('0' + val.getDate()).slice(-2);
+      obj[headers[i]] = y + '-' + m + '-' + d;
+    // Google Sheets auto-converts TRUE/FALSE strings to native boolean
+    } else if (typeof val === 'boolean') {
+      obj[headers[i]] = val ? 'TRUE' : 'FALSE';
+    } else {
+      obj[headers[i]] = (val !== undefined && val !== null) ? String(val) : '';
+    }
+  }
+  return obj;
+}
+
+function jsonReply(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
