@@ -18,8 +18,8 @@ export function renderManualSaleModal() {
   const canSubmit = items.length > 0 && items.every(item => {
     const b = S.books.find(x => x.id === item.bookId);
     if (!b || totalStock(b) < item.qty || item.finalPrice <= 0) return false;
-    // Kalau pakai batch manual, total harus pas dengan qty
-    if (Array.isArray(item.batchOverride) && item.batchOverride.length > 0) {
+    // Kalau batch override aktif (toggle on), total harus pas — biar 0 pun tetep gagal
+    if (Array.isArray(item.batchOverride)) {
       const total = item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0);
       if (total !== item.qty) return false;
     }
@@ -48,7 +48,7 @@ export function renderManualSaleModal() {
         if (!b) return '';
         const stock = totalStock(b);
         const normalP = getNormalPrice(b);
-        const useManual = Array.isArray(item.batchOverride) && item.batchOverride.length > 0;
+        const useManual = Array.isArray(item.batchOverride);
         const sim = useManual ? manualSim(b, item.batchOverride) : fifoSim(b, item.qty);
         const cogs = sim.cogs;
         const hppPerPcs = item.qty > 0 ? Math.round(cogs / item.qty) : 0;
@@ -370,8 +370,8 @@ export function saveSaleManual() {
     if (item.finalPrice !== normalP && !item.note) {
       showToast(`Isi catatan untuk "${b.title}" (harga beda dari normal)`, 'err'); return;
     }
-    // Validasi batch override
-    if (Array.isArray(item.batchOverride) && item.batchOverride.length > 0) {
+    // Validasi batch override — kalau toggle aktif, total wajib pas (biar 0 ditolak)
+    if (Array.isArray(item.batchOverride)) {
       const total = item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0);
       if (total !== item.qty) { showToast(`Batch manual "${b.title}": total ${total} ≠ qty ${item.qty}`, 'err'); return; }
     }
@@ -382,7 +382,7 @@ export function saveSaleManual() {
   for (const item of items) {
     const book   = S.books.find(x => x.id === item.bookId);
     const normalP = getNormalPrice(book);
-    const useManual = Array.isArray(item.batchOverride) && item.batchOverride.length > 0;
+    const useManual = Array.isArray(item.batchOverride);
     let cogs;
     if (useManual) {
       const res = manualDeduct(item.bookId, item.batchOverride);
