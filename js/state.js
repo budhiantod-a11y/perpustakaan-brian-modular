@@ -4,6 +4,8 @@
 
 // ── Core data ────────────────────────────────────────────────────────────────
 export let books = [], sales = [], restocks = [], preorders = [], cashflows = [];
+// Drafts buku — localStorage only, tidak di-sync ke Sheets
+export let drafts = [];
 function localDate() {
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -27,7 +29,7 @@ export let manualCartItems = [];
 // ── Setters (needed because only declaring module can reassign) ──────────────
 export const set = {
   books(v){ books=v; }, sales(v){ sales=v; }, restocks(v){ restocks=v; },
-  preorders(v){ preorders=v; }, cashflows(v){ cashflows=v; },
+  preorders(v){ preorders=v; }, cashflows(v){ cashflows=v; }, drafts(v){ drafts=v; },
   period(v){ period=v; },
   currentTab(v){ currentTab=v; }, stokSearch(v){ stokSearch=v; }, stokPub(v){ stokPub=v; },
   stokCat(v){ stokCat=v; }, searchDebounceTimer(v){ searchDebounceTimer=v; },
@@ -110,6 +112,7 @@ export function load() {
       restocks  = d.restocks  || [];
       preorders = (d.preorders || []).map(sanitizePreorder);
       cashflows = (d.cashflows || []).map(sanitizeCashflow);
+      drafts    = Array.isArray(d.drafts) ? d.drafts : [];
       period    = d.period    || period;
       return true;
     }
@@ -119,7 +122,7 @@ export function load() {
 
 export function save() {
   try {
-    localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, period }));
+    localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, period }));
   } catch(e) { console.warn('localStorage save failed'); }
   scheduleSync();
 }
@@ -298,7 +301,7 @@ export async function fetchFromSheetsOnBoot() {
         preorders = sheetPreorders;
         cashflows = sheetCashflows;
         // Save to localStorage (but scheduleSync is blocked, so won't push back to Sheets)
-        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, period })); }
+        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, period })); }
         catch(e) {}
       }
       bootFetching = false;

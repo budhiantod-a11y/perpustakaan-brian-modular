@@ -9,47 +9,130 @@ let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
 
 // ── Add Book ─────────────────────────────────────────────────────────────────
-export function openAddBook() {
+// draftId opsional → kalau di-resume dari draft, ID-nya dibawa biar saveBook bisa cleanup draft
+export function openAddBook(draftId = null) {
+  const draft = draftId ? S.drafts.find(d => d.id === draftId) : null;
+  const v = (k, fallback = '') => draft?.[k] != null ? String(draft[k]) : fallback;
   openModal(`
-    <div class="modal-title">Tambah Buku Baru</div>
+    <div class="modal-title">${draft ? '📝 Lanjutkan Draft Buku' : 'Tambah Buku Baru'}</div>
+    ${draft ? `<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:var(--radius-s);padding:8px 12px;margin-bottom:12px;font-size:12px;color:#92400e">
+      Draft disimpan ${draft.updatedAt || '—'}. Lengkapi data lalu simpan sebagai buku final.
+    </div>` : ''}
+    <input type="hidden" id="f_draft_id" value="${draftId || ''}">
     <div class="inp-grid-2">
       <div class="field" style="grid-column:1/-1">
         <label>Judul Buku *</label>
-        <input class="inp" id="f_title" placeholder="e.g. Laskar Pelangi">
+        <input class="inp" id="f_title" placeholder="e.g. Laskar Pelangi" value="${v('title')}">
       </div>
-      <div class="field"><label>Penulis</label><input class="inp" id="f_author" placeholder="e.g. Andrea Hirata"></div>
+      <div class="field"><label>Penulis</label><input class="inp" id="f_author" placeholder="e.g. Andrea Hirata" value="${v('author')}"></div>
       <div class="field"><label>Penerbit</label>
-        <input class="inp" id="f_publisher" list="pub-dl" placeholder="e.g. Bentang Pustaka">
+        <input class="inp" id="f_publisher" list="pub-dl" placeholder="e.g. Bentang Pustaka" value="${v('publisher')}">
         <datalist id="pub-dl">${allPubs().map(p=>`<option value="${p}">`).join('')}</datalist>
       </div>
       <div class="field"><label>Kategori</label>
-        <input class="inp" id="f_category" list="cat-dl" placeholder="e.g. Fiksi">
+        <input class="inp" id="f_category" list="cat-dl" placeholder="e.g. Fiksi" value="${v('category')}">
         <datalist id="cat-dl">${allCats().map(c=>`<option value="${c}">`).join('')}</datalist>
       </div>
-      <div class="field"><label>Barcode / ISBN *</label><input class="inp" id="f_barcode" placeholder="e.g. 9786020651965"></div>
+      <div class="field"><label>Barcode / ISBN *</label><input class="inp" id="f_barcode" placeholder="e.g. 9786020651965" value="${v('barcode')}"></div>
     </div>
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-s);padding:14px;margin-bottom:4px">
       <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">💰 Harga</div>
       <div class="inp-grid-2">
         <div class="field" style="margin-bottom:0">
           <label>Harga Modal / Beli (Rp)</label>
-          <input class="inp" id="f_bp" type="number" placeholder="0">
+          <input class="inp" id="f_bp" type="number" placeholder="0" value="${v('buyPrice','')}">
           <div class="hint">Harga beli pertama kali (opsional)</div>
         </div>
         <div class="field" style="margin-bottom:0">
           <label>Harga Normal / Jual (Rp)</label>
-          <input class="inp" id="f_sell" type="number" placeholder="0">
+          <input class="inp" id="f_sell" type="number" placeholder="0" value="${v('normalPrice','')}">
           <div class="hint">Default harga jual ke pembeli (opsional)</div>
         </div>
       </div>
     </div>
     <div class="inp-grid-2" style="margin-top:8px">
-      <div class="field"><label>Stok Awal (pcs)</label><input class="inp" id="f_stock" type="number" value="0"></div>
+      <div class="field"><label>Stok Awal (pcs)</label><input class="inp" id="f_stock" type="number" value="${v('stock','0')}"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-ghost" onclick="saveBookDraft()" title="Simpan progress — bisa dilanjutkan nanti">📝 Simpan Draft</button>
       <button class="btn btn-primary" onclick="saveBook()">Simpan Buku</button>
     </div>`);
+}
+
+// ── Save / List / Resume / Delete Draft ──────────────────────────────────────
+export function saveBookDraft() {
+  const v = k => document.getElementById('f_'+k)?.value?.trim();
+  const draftId = document.getElementById('f_draft_id')?.value || '';
+  if (!v('title')) { showToast('Minimal isi judul untuk simpan draft', 'err'); return; }
+  const payload = {
+    title:       v('title'),
+    author:      v('author'),
+    publisher:   v('publisher'),
+    category:    v('category'),
+    barcode:     v('barcode'),
+    buyPrice:    +v('bp') || 0,
+    normalPrice: +v('sell') || 0,
+    stock:       +v('stock') || 0,
+    updatedAt:   today(),
+  };
+  if (draftId) {
+    const existing = S.drafts.find(d => d.id === draftId);
+    if (existing) Object.assign(existing, payload);
+    else S.drafts.push({ id: draftId, ...payload });
+  } else {
+    S.drafts.push({ id: uid(), ...payload });
+  }
+  closeModal(); S.save(); showToast('Draft tersimpan ✓'); _render();
+}
+
+export function openDraftList() {
+  if (!S.drafts.length) {
+    openModal(`
+      <div class="modal-title">📝 Draft Buku</div>
+      <div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">
+        Belum ada draft. Mulai dari "+ Tambah Buku" → klik "Simpan Draft" kalau belum siap finalisasi.
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Tutup</button>
+      </div>`);
+    return;
+  }
+  const rows = S.drafts.map(d => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-s);margin-bottom:8px;background:var(--surface)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px">${d.title || '(tanpa judul)'}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">
+          ${[d.author, d.publisher, d.category].filter(Boolean).join(' · ') || '—'}
+          ${d.barcode ? ` · <span style="font-family:monospace">${d.barcode}</span>` : ''}
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">Diperbarui ${d.updatedAt || '—'}</div>
+      </div>
+      <button class="btn btn-primary btn-xs" onclick='resumeDraft(${JSON.stringify(d.id)})'>Lanjutkan</button>
+      <button class="btn btn-ghost btn-xs" onclick='deleteDraft(${JSON.stringify(d.id)})' style="color:var(--red);border-color:var(--red-s)">Hapus</button>
+    </div>
+  `).join('');
+  openModal(`
+    <div class="modal-title">📝 Draft Buku (${S.drafts.length})</div>
+    <div style="max-height:50vh;overflow-y:auto">${rows}</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Tutup</button>
+    </div>`);
+}
+
+export function resumeDraft(draftId) {
+  closeModal();
+  openAddBook(draftId);
+}
+
+export function deleteDraft(draftId) {
+  const d = S.drafts.find(x => x.id === draftId);
+  if (!d) return;
+  if (!confirm(`Hapus draft "${d.title || '(tanpa judul)'}"?`)) return;
+  S.set.drafts(S.drafts.filter(x => x.id !== draftId));
+  S.save(); showToast('Draft dihapus');
+  if (S.drafts.length) openDraftList();
+  else { closeModal(); _render(); }
 }
 
 // ── Edit Book ────────────────────────────────────────────────────────────────
@@ -102,6 +185,7 @@ export function openEditBook(bookId) {
 // ── Save New Book ────────────────────────────────────────────────────────────
 export function saveBook() {
   const v = k => document.getElementById('f_'+k)?.value?.trim();
+  const draftId = document.getElementById('f_draft_id')?.value || '';
   if (!v('title')||!v('barcode')) { showToast('Lengkapi field wajib (judul dan barcode)!', 'err'); return; }
   if (S.books.find(b => b.barcode===v('barcode'))) { showToast('Barcode sudah ada!', 'err'); return; }
   const normalP = +v('sell')||0;
@@ -114,7 +198,10 @@ export function saveBook() {
     book.batches.push({ id:uid(), qty:+v('stock'), remaining:+v('stock'), buyPrice:buyP, date:today() });
     S.restocks.push({ id:uid(), bookId:book.id, bookTitle:book.title, qty:+v('stock'), buyPrice:buyP, date:today() });
   }
-  S.books.push(book); closeModal(); S.save(); showToast('Buku ditambahkan ✓'); _render();
+  S.books.push(book);
+  // Cleanup draft kalau buku ini di-save dari resumed draft
+  if (draftId) S.set.drafts(S.drafts.filter(d => d.id !== draftId));
+  closeModal(); S.save(); showToast('Buku ditambahkan ✓'); _render();
 }
 
 // ── Update Existing Book ─────────────────────────────────────────────────────

@@ -385,3 +385,50 @@ export function processBulkSales() {
     showToast(`✓ ${processed.length} transaksi bulk berhasil diproses!`);
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT: Stok snapshot ke Excel (mengikuti filter aktif tab Stok)
+// ═══════════════════════════════════════════════════════════════════════════
+export function exportStokExcel() {
+  if (!window.XLSX) { showToast('Library Excel belum siap, coba lagi sebentar', 'err'); return; }
+
+  // Reapply filter aktif tab Stok (search + publisher + kategori) → identik dengan view
+  const q = (S.stokSearch || '').toLowerCase().trim();
+  const fb = S.books.filter(b => {
+    const ms = !q || [b.title, b.author, b.publisher, String(b.barcode||''), b.category].some(v => v?.toLowerCase().includes(q));
+    return ms && (!S.stokPub || b.publisher === S.stokPub) && (!S.stokCat || b.category === S.stokCat);
+  });
+
+  if (!fb.length) { showToast('Tidak ada buku untuk di-export', 'err'); return; }
+
+  const headers = ['Barcode','Judul','Penulis','Penerbit','Kategori','Total Stok','Harga Modal Rata2','Harga Jual Normal','Jumlah Batch','Tgl Restock Terakhir'];
+  const rows = fb.map(b => {
+    const stk = totalStock(b);
+    const avg = stk ? Math.round(b.batches.reduce((s,bt)=>s+bt.remaining*bt.buyPrice,0)/stk) : 0;
+    const activeBatches = b.batches.filter(bt => bt.remaining > 0);
+    const lastDate = b.batches.length
+      ? [...b.batches].map(bt=>bt.date).filter(Boolean).sort().slice(-1)[0] || ''
+      : '';
+    return [
+      String(b.barcode || ''),
+      b.title || '',
+      b.author || '',
+      b.publisher || '',
+      b.category || '',
+      stk,
+      avg,
+      b.normalPrice || b.sellPrice || 0,
+      activeBatches.length,
+      lastDate,
+    ];
+  });
+
+  const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  ws['!cols'] = [18, 32, 22, 22, 16, 11, 16, 16, 12, 16].map(w => ({ wch: w }));
+  const wb = window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb, ws, 'Stok');
+
+  const fname = `stok-perpustakaan-brian-${today()}.xlsx`;
+  window.XLSX.writeFile(wb, fname);
+  showToast(`✓ ${fb.length} buku di-export ke ${fname}`);
+}

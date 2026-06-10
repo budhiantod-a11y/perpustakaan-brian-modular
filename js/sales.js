@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 import * as S from './state.js';
 import { openModal, closeModal, showToast, uid, today, fmt, getNormalPrice } from './helpers.js';
-import { totalStock, fifoDeduct, fifoSim } from './fifo.js';
+import { totalStock, fifoDeduct, fifoSim, manualDeduct, manualSim } from './fifo.js';
 
 let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
@@ -17,7 +17,13 @@ export function renderManualSaleModal() {
   const items = S.manualCartItems;
   const canSubmit = items.length > 0 && items.every(item => {
     const b = S.books.find(x => x.id === item.bookId);
-    return b && totalStock(b) >= item.qty && item.finalPrice > 0;
+    if (!b || totalStock(b) < item.qty || item.finalPrice <= 0) return false;
+    // Kalau pakai batch manual, total harus pas dengan qty
+    if (Array.isArray(item.batchOverride) && item.batchOverride.length > 0) {
+      const total = item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0);
+      if (total !== item.qty) return false;
+    }
+    return true;
   });
 
   openModal(`
@@ -42,41 +48,78 @@ export function renderManualSaleModal() {
         if (!b) return '';
         const stock = totalStock(b);
         const normalP = getNormalPrice(b);
-        const { cogs } = fifoSim(b, item.qty);
+        const useManual = Array.isArray(item.batchOverride) && item.batchOverride.length > 0;
+        const sim = useManual ? manualSim(b, item.batchOverride) : fifoSim(b, item.qty);
+        const cogs = sim.cogs;
         const hppPerPcs = item.qty > 0 ? Math.round(cogs / item.qty) : 0;
         const kurang = stock < item.qty;
         const diff = item.finalPrice - normalP;
         const diffClass = diff < 0 ? 'diff-down' : diff > 0 ? 'diff-up' : 'diff-same';
         const diffText = diff < 0 ? fmt(diff) : diff > 0 ? '+'+fmt(diff) : '—';
         const isDiskon = item.finalPrice !== normalP;
-        return `<div class="bundle-item-row" style="${kurang ? 'border-color:var(--red);background:#fef2f2' : ''}">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:13px">${b.title}</div>
-            <div style="font-size:11px;color:var(--text3)">Normal: ${fmt(normalP)} · HPP: ${fmt(hppPerPcs)}/pcs · Stok: ${stock}</div>
-            ${kurang ? `<div style="font-size:11px;color:var(--red);font-weight:600">⚠ Stok tidak cukup!</div>` : ''}
+        const activeBatches = b.batches.filter(bt => bt.remaining > 0)
+          .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+        const multipleBatches = activeBatches.length > 1;
+        const overrideTotal = useManual ? item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0) : 0;
+        const overrideOk = useManual && overrideTotal === item.qty;
+        return `<div class="bundle-item-row" style="${kurang ? 'border-color:var(--red);background:#fef2f2' : (useManual ? 'border-color:#7c3aed' : '')};flex-direction:column;align-items:stretch">
+          <div style="display:flex;gap:12px;align-items:flex-start;width:100%">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:13px">${b.title}</div>
+              <div style="font-size:11px;color:var(--text3)">Normal: ${fmt(normalP)} · HPP: ${fmt(hppPerPcs)}/pcs · Stok: ${stock}</div>
+              ${kurang ? `<div style="font-size:11px;color:var(--red);font-weight:600">⚠ Stok tidak cukup!</div>` : ''}
+              ${useManual && !overrideOk ? `<div style="font-size:11px;color:#7c3aed;font-weight:600">⚠ Batch manual: ${overrideTotal}/${item.qty} pcs — total harus pas</div>` : ''}
+              ${useManual && overrideOk ? `<div style="font-size:11px;color:#7c3aed">✓ Batch manual aktif</div>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+              <div style="display:flex;align-items:center;gap:6px">
+                <button class="btn btn-ghost btn-xs" onclick="manualCartChangeQty(${idx},-1)">−</button>
+                <span style="font-weight:700;min-width:24px;text-align:center">${item.qty}</span>
+                <button class="btn btn-ghost btn-xs" onclick="manualCartChangeQty(${idx},+1)">+</button>
+                <button class="btn btn-danger btn-xs" style="margin-left:4px" onclick="manualCartRemoveItem(${idx})">✕</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <label style="font-size:11px;color:var(--text3);white-space:nowrap">Harga:</label>
+                <input class="inp" type="number" id="manual-price-${idx}" value="${item.finalPrice}"
+                  oninput="manualCartUpdatePrice(${idx},+this.value)"
+                  style="width:110px;font-size:13px;padding:4px 8px;${isDiskon ? 'border-color:var(--orange)' : 'border-color:var(--accent)'}">
+                <span class="price-diff-pill ${diffClass}" id="manual-diff-${idx}">${diffText}</span>
+              </div>
+              <div id="manual-note-wrap-${idx}" style="width:100%">
+                <input class="inp" type="text" id="manual-note-${idx}"
+                  value="${(item.note||'').replace(/"/g,'&quot;')}"
+                  placeholder="${isDiskon ? 'Catatan diskon (wajib)...' : 'Catatan (opsional)...'}"
+                  oninput="manualCartUpdateNote(${idx},this.value)"
+                  style="font-size:12px;padding:4px 8px;width:100%;box-sizing:border-box">
+              </div>
+            </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-            <div style="display:flex;align-items:center;gap:6px">
-              <button class="btn btn-ghost btn-xs" onclick="manualCartChangeQty(${idx},-1)">−</button>
-              <span style="font-weight:700;min-width:24px;text-align:center">${item.qty}</span>
-              <button class="btn btn-ghost btn-xs" onclick="manualCartChangeQty(${idx},+1)">+</button>
-              <button class="btn btn-danger btn-xs" style="margin-left:4px" onclick="manualCartRemoveItem(${idx})">✕</button>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px">
-              <label style="font-size:11px;color:var(--text3);white-space:nowrap">Harga:</label>
-              <input class="inp" type="number" id="manual-price-${idx}" value="${item.finalPrice}"
-                oninput="manualCartUpdatePrice(${idx},+this.value)"
-                style="width:110px;font-size:13px;padding:4px 8px;${isDiskon ? 'border-color:var(--orange)' : 'border-color:var(--accent)'}">
-              <span class="price-diff-pill ${diffClass}" id="manual-diff-${idx}">${diffText}</span>
-            </div>
-            <div id="manual-note-wrap-${idx}" style="width:100%">
-              <input class="inp" type="text" id="manual-note-${idx}"
-                value="${(item.note||'').replace(/"/g,'&quot;')}"
-                placeholder="${isDiskon ? 'Catatan diskon (wajib)...' : 'Catatan (opsional)...'}"
-                oninput="manualCartUpdateNote(${idx},this.value)"
-                style="font-size:12px;padding:4px 8px;width:100%;box-sizing:border-box">
-            </div>
-          </div>
+          ${multipleBatches ? `
+          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);cursor:pointer">
+              <input type="checkbox" ${useManual ? 'checked' : ''} onchange="manualCartToggleBatchOverride(${idx})" style="cursor:pointer">
+              Pilih batch manual (default: FIFO)
+            </label>
+            ${useManual ? `
+            <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
+              ${activeBatches.map(bt => {
+                const ov = item.batchOverride.find(o => o.batchId === bt.id);
+                const qtyVal = ov ? ov.qty : 0;
+                return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 8px;background:var(--bg);border-radius:var(--radius-s)">
+                  <span style="color:var(--text3);min-width:74px;font-size:11px">${bt.date || '—'}</span>
+                  <span style="min-width:60px;font-size:11px">${fmt(bt.buyPrice)}/pcs</span>
+                  <span style="color:var(--text3);min-width:60px;font-size:11px">sisa ${bt.remaining}</span>
+                  <input type="number" min="0" max="${bt.remaining}" value="${qtyVal}"
+                    oninput="manualCartSetBatchQty(${idx}, ${JSON.stringify(bt.id)}, +this.value)"
+                    style="width:60px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;margin-left:auto">
+                  <span style="font-size:10px;color:var(--text3)">pcs</span>
+                </div>`;
+              }).join('')}
+              <div id="manual-batch-total-${idx}" style="font-size:11px;color:${overrideOk ? 'var(--green)' : '#7c3aed'};text-align:right;margin-top:2px;font-weight:600">
+                Total: ${overrideTotal} / ${item.qty} pcs ${overrideOk ? '✓' : ''}
+              </div>
+            </div>` : ''}
+          </div>` : ''}
         </div>`;
       }).join('')}
     </div>
@@ -194,6 +237,54 @@ export function manualCartUpdateNote(idx, val) {
   item.note = val;
 }
 
+// ── Batch override (manual pilih batch) ──────────────────────────────────────
+export function manualCartToggleBatchOverride(idx) {
+  const item = S.manualCartItems[idx];
+  if (!item) return;
+  if (Array.isArray(item.batchOverride) && item.batchOverride.length > 0) {
+    // Matikan → revert ke FIFO
+    delete item.batchOverride;
+  } else {
+    // Aktifkan → prefill pakai FIFO order biar user tinggal sesuaikan
+    const b = S.books.find(x => x.id === item.bookId);
+    if (!b) return;
+    const { details } = fifoSim(b, item.qty);
+    // Map details ke batchId
+    const sorted = [...b.batches].filter(bt => bt.remaining > 0).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    const overrides = [];
+    let left = item.qty;
+    for (const bt of sorted) {
+      if (left <= 0) break;
+      const take = Math.min(bt.remaining, left);
+      overrides.push({ batchId: bt.id, qty: take });
+      left -= take;
+    }
+    item.batchOverride = overrides;
+  }
+  renderManualSaleModal();
+}
+
+export function manualCartSetBatchQty(idx, batchId, val) {
+  const item = S.manualCartItems[idx];
+  if (!item || !Array.isArray(item.batchOverride)) return;
+  const qty = Math.max(0, +val || 0);
+  const existing = item.batchOverride.find(o => o.batchId === batchId);
+  if (existing) {
+    existing.qty = qty;  // keep entry walau 0, biar field gak hilang & cursor terjaga
+  } else if (qty > 0) {
+    item.batchOverride.push({ batchId, qty });
+  }
+  // Skip full re-render (preserve focus) — submit button validation di-handle saveSaleManual
+  // Cuma update total counter inline kalau ada
+  const total = item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0);
+  const counterEl = document.getElementById(`manual-batch-total-${idx}`);
+  if (counterEl) {
+    const ok = total === item.qty;
+    counterEl.innerHTML = `Total: ${total} / ${item.qty} pcs ${ok ? '✓' : ''}`;
+    counterEl.style.color = ok ? 'var(--green)' : '#7c3aed';
+  }
+}
+
 
 export function onScanPriceInput(el) {
   const val = +el.value;
@@ -264,6 +355,11 @@ export function saveSaleManual() {
     if (item.finalPrice !== normalP && !item.note) {
       showToast(`Isi catatan untuk "${b.title}" (harga beda dari normal)`, 'err'); return;
     }
+    // Validasi batch override
+    if (Array.isArray(item.batchOverride) && item.batchOverride.length > 0) {
+      const total = item.batchOverride.reduce((s,o)=>s+(+o.qty||0),0);
+      if (total !== item.qty) { showToast(`Batch manual "${b.title}": total ${total} ≠ qty ${item.qty}`, 'err'); return; }
+    }
   }
 
   const groupId = items.length > 1 ? 'mg_' + uid() : null;
@@ -271,7 +367,15 @@ export function saveSaleManual() {
   for (const item of items) {
     const book   = S.books.find(x => x.id === item.bookId);
     const normalP = getNormalPrice(book);
-    const { cogs } = fifoDeduct(item.bookId, item.qty);
+    const useManual = Array.isArray(item.batchOverride) && item.batchOverride.length > 0;
+    let cogs;
+    if (useManual) {
+      const res = manualDeduct(item.bookId, item.batchOverride);
+      if (!res.ok) { showToast(`Batch "${book.title}": ${res.reason}`, 'err'); return; }
+      cogs = res.cogs;
+    } else {
+      cogs = fifoDeduct(item.bookId, item.qty).cogs;
+    }
     const profit   = item.qty * item.finalPrice - cogs;
     const isDiskon = item.finalPrice !== normalP;
     S.sales.push({
@@ -289,6 +393,7 @@ export function saveSaleManual() {
       priceOverride: isDiskon,
       note: item.note || '',
       customer,
+      ...(useManual ? { batchSource: 'manual' } : {}),
       ...(groupId ? { groupId } : {}),
     });
   }

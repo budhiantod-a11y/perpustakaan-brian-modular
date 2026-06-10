@@ -44,3 +44,37 @@ export function fifoSim(book, qty) {
   }
   return { cogs, details };
 }
+
+// ── Manual batch override ────────────────────────────────────────────────────
+// overrides: [{ batchId, qty }, ...] — user pilih batch mana yang dipakai
+// Validasi: tiap batch harus ada & remaining cukup; sum(qty) harus match total qty
+export function manualDeduct(bookId, overrides) {
+  const book = books.find(b => b.id === bookId);
+  if (!book) return { cogs:0, details:[], ok:false, reason:'Buku tidak ditemukan' };
+  let cogs = 0, details = [];
+  for (const ov of overrides) {
+    const bt = book.batches.find(b => b.id === ov.batchId);
+    if (!bt)            return { cogs:0, details:[], ok:false, reason:'Batch tidak ditemukan' };
+    if (bt.remaining < ov.qty) return { cogs:0, details:[], ok:false, reason:`Batch ${bt.date||'?'} sisa ${bt.remaining} pcs, diminta ${ov.qty}` };
+    cogs += ov.qty * bt.buyPrice;
+    details.push({ batchDate: bt.date, buyPrice: bt.buyPrice, qty: ov.qty });
+  }
+  // Semua valid → deduct
+  for (const ov of overrides) {
+    const bt = book.batches.find(b => b.id === ov.batchId);
+    bt.remaining -= ov.qty;
+  }
+  return { cogs, details, ok:true };
+}
+
+export function manualSim(book, overrides) {
+  let cogs = 0, details = [], totalQty = 0;
+  for (const ov of overrides) {
+    const bt = book.batches.find(b => b.id === ov.batchId);
+    if (!bt) continue;
+    cogs += ov.qty * bt.buyPrice;
+    totalQty += ov.qty;
+    details.push({ batchDate: bt.date, buyPrice: bt.buyPrice, qty: ov.qty });
+  }
+  return { cogs, details, totalQty };
+}

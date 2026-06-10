@@ -122,6 +122,11 @@ Object.assign(window, {
   saveBook:       Books.saveBook,
   updateBook:     Books.updateBook,
   saveRestock:    Books.saveRestock,
+  // Drafts buku
+  saveBookDraft:  Books.saveBookDraft,
+  openDraftList:  Books.openDraftList,
+  resumeDraft:    Books.resumeDraft,
+  deleteDraft:    Books.deleteDraft,
 
   // Sales
   openSaleManual:         Sales.openSaleManual,
@@ -132,6 +137,8 @@ Object.assign(window, {
   manualCartChangeQty:    Sales.manualCartChangeQty,
   manualCartUpdatePrice:  Sales.manualCartUpdatePrice,
   manualCartUpdateNote:   Sales.manualCartUpdateNote,
+  manualCartToggleBatchOverride: Sales.manualCartToggleBatchOverride,
+  manualCartSetBatchQty:  Sales.manualCartSetBatchQty,
   onScanPriceInput:       Sales.onScanPriceInput,
   onScanNoteInput:        Sales.onScanNoteInput,
   saveSaleManual:         Sales.saveSaleManual,
@@ -189,6 +196,7 @@ Object.assign(window, {
   handleImportFile: Import.handleImportFile,
   toggleImportRow:  Import.toggleImportRow,
   commitImport:     Import.commitImport,
+  exportStokExcel:  Import.exportStokExcel,
   selectAllImport() { S.importRows.forEach(r=>{ if(r._status!=='error') r._checked=true; }); render(); },
   unselectAllImport() { S.importRows.forEach(r=>r._checked=false); render(); },
 

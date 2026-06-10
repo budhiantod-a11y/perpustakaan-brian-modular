@@ -8,6 +8,15 @@ import { getPoStatus, getPoTotal, getStatusLabel } from './preorder.js';
 import * as Laporan from './laporan.js';
 
 export function render() {
+  // Preserve focus + cursor position across re-render (search inputs that trigger render on every keystroke)
+  const _focusSnapshot = (() => {
+    const el = document.activeElement;
+    if (!el || !el.id) return null;
+    const trackedIds = ['cf-search', 'stok-search-input'];
+    if (!trackedIds.includes(el.id)) return null;
+    return { id: el.id, start: el.selectionStart, end: el.selectionEnd };
+  })();
+
   const lowStock = S.books.filter(b => totalStock(b) <= 5);
   const pill = document.getElementById('low-pill');
   const txt  = document.getElementById('low-text');
@@ -150,6 +159,12 @@ export function render() {
       <div class="page-hdr">
         <div><div class="page-title">Stok Buku</div><div class="page-sub">${fb.length} dari ${S.books.length} judul</div></div>
         <div class="page-actions">
+          <button class="btn btn-ghost" onclick="openDraftList()" title="${S.drafts?.length ? S.drafts.length+' draft tersimpan' : 'Belum ada draft'}">
+            📝 Draft${S.drafts?.length ? ` (${S.drafts.length})` : ''}
+          </button>
+          <button class="btn btn-ghost" onclick="exportStokExcel()" title="Export buku tampil (sesuai filter) ke Excel">
+            ↓ Export Excel
+          </button>
           <button class="btn btn-ghost" onclick="toggleImportPanel()" style="${S.showImportPanel?'background:var(--accent-s);color:var(--accent);border-color:var(--accent-t)':''}">
             ↑ Import CSV
           </button>
@@ -1297,8 +1312,17 @@ export function render() {
     // Reset scanner flag after each render
   setTimeout(() => { S.set.scannerJustFired(false); }, 100);
 
-  // Keep focus on search input after render so scanner can fire again
-  if (S.currentTab === 'stok' && S.stokSearch) {
+  // Restore focus + cursor position on tracked search inputs after re-render
+  if (_focusSnapshot) {
+    setTimeout(() => {
+      const inp = document.getElementById(_focusSnapshot.id);
+      if (inp && document.activeElement !== inp) {
+        inp.focus();
+        try { inp.setSelectionRange(_focusSnapshot.start, _focusSnapshot.end); } catch(_){}
+      }
+    }, 0);
+  } else if (S.currentTab === 'stok' && S.stokSearch) {
+    // Keep focus on stok search after render so scanner can fire again
     setTimeout(() => {
       const inp = document.getElementById('stok-search-input');
       if (inp && document.activeElement !== inp) inp.focus();
