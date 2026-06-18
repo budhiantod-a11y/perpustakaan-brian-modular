@@ -18,6 +18,7 @@ let selectedMonth = null;
 let trendRange    = 6;          // 3 | 6 | 12
 let trendMetric   = 'revenue';  // 'revenue' | 'profit' | 'margin' | 'units'
 let chartInstance = null;
+let publisherChartInstance = null;
 
 function ensureInit() {
   if (selectedYear === null) {
@@ -112,8 +113,28 @@ export function aggregateBookBreakdown(sales, year, month) {
   }
 
   return [...acc.values()]
-    .map(e => ({ ...e, qtyTotal: e.qtySatuan + e.qtyBundle }))
+    .map(e => {
+      const book = S.books.find(b => b.id === e.bookId);
+      return { ...e, qtyTotal: e.qtySatuan + e.qtyBundle, publisher: (book?.publisher || '').trim() };
+    })
     .sort((a, b) => b.qtyTotal - a.qtyTotal || a.title.localeCompare(b.title));
+}
+
+// Aggregate qty per penerbit dari list breakdown.
+// Return: { top: [{publisher, qty}, ...], lainnya: [{publisher, qty}, ...] | null }
+// Kalau jumlah penerbit > 10, top 9 ditampil + Lainnya berisi sisanya.
+export function aggregateByPublisher(breakdownList, topN = 9) {
+  const map = new Map();
+  for (const r of breakdownList) {
+    const pub = r.publisher || '(Tanpa penerbit)';
+    map.set(pub, (map.get(pub) || 0) + r.qtyTotal);
+  }
+  const all = [...map.entries()]
+    .map(([publisher, qty]) => ({ publisher, qty }))
+    .sort((a, b) => b.qty - a.qty || a.publisher.localeCompare(b.publisher));
+
+  if (all.length <= topN + 1) return { top: all, lainnya: null };
+  return { top: all.slice(0, topN), lainnya: all.slice(topN) };
 }
 
 // n bulan terakhir inklusif anchor, urut dari paling lama → paling baru.
@@ -271,7 +292,7 @@ export function renderInto(area) {
   `;
 
   // Draw chart setelah DOM in place (Chart.js butuh canvas punya layout)
-  setTimeout(drawChart, 0);
+  setTimeout(() => { drawChart(); drawPublisherChart(); }, 0);
 }
 
 function renderKpiCard(label, val, deltaHtml, prevVal, prevFmt, colorCss) {
@@ -414,6 +435,7 @@ function renderBookBreakdown() {
   const rowsHtml = list.map(r => `
     <tr data-title="${escapeAttr((r.title || '').toLowerCase())}">
       <td>${escapeAttr(r.title || '(tanpa judul)')}</td>
+      <td>${escapeAttr(r.publisher || '—')}</td>
       <td style="text-align:right">${r.qtySatuan || '—'}</td>
       <td style="text-align:right">${r.qtyBundle || '—'}</td>
       <td style="text-align:right;font-weight:600">${r.qtyTotal}</td>
@@ -421,6 +443,10 @@ function renderBookBreakdown() {
   `).join('');
 
   return `
+    <div class="lap-chart-wrap" style="margin-bottom:16px">
+      <canvas id="laporan-publisher-chart"></canvas>
+      <div id="laporan-publisher-empty" class="lap-empty-inline" style="display:none">Chart library belum ke-load (cek koneksi CDN)</div>
+    </div>
     <div style="margin-bottom:12px">
       <input class="inp" id="lap-breakdown-search" type="text" placeholder="Cari judul buku..."
         oninput="laporanFilterBreakdown(this.value)" autocomplete="off">
@@ -430,6 +456,7 @@ function renderBookBreakdown() {
         <thead>
           <tr>
             <th>Judul</th>
+            <th>Penerbit</th>
             <th style="text-align:right">Satuan</th>
             <th style="text-align:right">Bundling</th>
             <th style="text-align:right">Total</th>
@@ -439,6 +466,7 @@ function renderBookBreakdown() {
         <tfoot>
           <tr class="lap-table-summary">
             <td>Total (${list.length} judul)</td>
+            <td></td>
             <td style="text-align:right">${totalSatuan}</td>
             <td style="text-align:right">${totalBundle}</td>
             <td style="text-align:right">${totalAll}</td>
@@ -526,5 +554,66 @@ function drawChart() {
         }
       }
     }
+  });
+}
+
+// Doughnut chart breakdown qty per penerbit.
+// Top 9 visible; sisanya di-group jadi "Lainnya" — tooltip-nya list semua penerbit.
+function drawPublisherChart() {
+  const canvas = document.getElementById('laporan-publisher-chart');
+  const empty  = document.getElementById('laporan-publisher-empty');
+  if (!canvas) return;
+
+  if (typeof Chart === 'undefined') {
+    canvas.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+
+  if (publisherChartInstance) { publisherChartInstance.destroy(); publisherChartInstance = null; }
+
+  const list = aggregateBookBreakdown(S.sales, selectedYear, selectedMonth);
+  if (list.length === 0) { canvas.style.display = 'none'; return; }
+
+  const { top, lainnya } = aggregateByPublisher(list);
+  const lainnyaQty = lainnya ? lainnya.reduce((s, x) => s + x.qty, 0) : 0;
+
+  const labels = [...top.map(t => t.publisher), ...(lainnya ? ['Lainnya'] : [])];
+  const values = [...top.map(t => t.qty),       ...(lainnya ? [lainnyaQty] : [])];
+  const total  = values.reduce((a, b) => a + b, 0) || 1;
+
+  const palette = [
+    '#16a34a','#4f46e5','#d97706','#2563eb','#dc2626',
+    '#0891b2','#db2777','#65a30d','#7c3aed','#94a3b8',
+  ];
+  const colors = labels.map((_, i) => palette[i % palette.length]);
+
+  publisherChartInstance = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 14 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v   = ctx.parsed;
+              const pct = (v / total * 100).toFixed(1);
+              return `${ctx.label}: ${v} buku (${pct}%)`;
+            },
+            afterLabel: (ctx) => {
+              if (ctx.label !== 'Lainnya' || !lainnya) return '';
+              return lainnya.map(x => `  • ${x.publisher}: ${x.qty}`);
+            },
+          },
+        },
+      },
+    },
   });
 }
