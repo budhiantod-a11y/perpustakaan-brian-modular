@@ -121,20 +121,16 @@ export function aggregateBookBreakdown(sales, year, month) {
 }
 
 // Aggregate qty per penerbit dari list breakdown.
-// Return: { top: [{publisher, qty}, ...], lainnya: [{publisher, qty}, ...] | null }
-// Kalau jumlah penerbit > 10, top 9 ditampil + Lainnya berisi sisanya.
-export function aggregateByPublisher(breakdownList, topN = 9) {
+// Return semua penerbit (sort desc by qty, lalu alfabetis).
+export function aggregateByPublisher(breakdownList) {
   const map = new Map();
   for (const r of breakdownList) {
     const pub = r.publisher || '(Tanpa penerbit)';
     map.set(pub, (map.get(pub) || 0) + r.qtyTotal);
   }
-  const all = [...map.entries()]
+  return [...map.entries()]
     .map(([publisher, qty]) => ({ publisher, qty }))
     .sort((a, b) => b.qty - a.qty || a.publisher.localeCompare(b.publisher));
-
-  if (all.length <= topN + 1) return { top: all, lainnya: null };
-  return { top: all.slice(0, topN), lainnya: all.slice(topN) };
 }
 
 // n bulan terakhir inklusif anchor, urut dari paling lama → paling baru.
@@ -170,15 +166,33 @@ export function setTrendMetric(m) {
   rerender();
 }
 
-// Filter rows breakdown by judul. Tidak rerender supaya cursor di search input gak loncat.
-export function filterBreakdown(query) {
-  const q = (query || '').toLowerCase().trim();
-  const tbody = document.getElementById('lap-breakdown-tbody');
+// Filter rows breakdown by judul + penerbit. Tidak rerender supaya cursor di search input gak loncat.
+// Footer total ikut re-compute supaya bisa di-tally dgn bar chart penerbit.
+export function filterBreakdown() {
+  const titleQ = (document.getElementById('lap-breakdown-search')?.value || '').toLowerCase().trim();
+  const pubQ   = (document.getElementById('lap-breakdown-pub-search')?.value || '').toLowerCase().trim();
+  const tbody  = document.getElementById('lap-breakdown-tbody');
   if (!tbody) return;
+
+  let totalSatuan = 0, totalBundle = 0, visibleCount = 0;
   for (const tr of tbody.querySelectorAll('tr')) {
     const t = tr.getAttribute('data-title') || '';
-    tr.style.display = (!q || t.includes(q)) ? '' : 'none';
+    const p = tr.getAttribute('data-publisher') || '';
+    const match = (!titleQ || t.includes(titleQ)) && (!pubQ || p.includes(pubQ));
+    tr.style.display = match ? '' : 'none';
+    if (match) {
+      totalSatuan += +tr.getAttribute('data-satuan') || 0;
+      totalBundle += +tr.getAttribute('data-bundle') || 0;
+      visibleCount++;
+    }
   }
+
+  const totalAll = totalSatuan + totalBundle;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('lap-breakdown-foot-count',  visibleCount);
+  setTxt('lap-breakdown-foot-satuan', totalSatuan);
+  setTxt('lap-breakdown-foot-bundle', totalBundle);
+  setTxt('lap-breakdown-foot-total',  totalAll);
 }
 
 function rerender() {
@@ -433,7 +447,10 @@ function renderBookBreakdown() {
   const totalAll    = totalSatuan + totalBundle;
 
   const rowsHtml = list.map(r => `
-    <tr data-title="${escapeAttr((r.title || '').toLowerCase())}">
+    <tr data-title="${escapeAttr((r.title || '').toLowerCase())}"
+        data-publisher="${escapeAttr((r.publisher || '').toLowerCase())}"
+        data-satuan="${r.qtySatuan}"
+        data-bundle="${r.qtyBundle}">
       <td>${escapeAttr(r.title || '(tanpa judul)')}</td>
       <td>${escapeAttr(r.publisher || '—')}</td>
       <td style="text-align:right">${r.qtySatuan || '—'}</td>
@@ -447,9 +464,11 @@ function renderBookBreakdown() {
       <canvas id="laporan-publisher-chart"></canvas>
       <div id="laporan-publisher-empty" class="lap-empty-inline" style="display:none">Chart library belum ke-load (cek koneksi CDN)</div>
     </div>
-    <div style="margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
       <input class="inp" id="lap-breakdown-search" type="text" placeholder="Cari judul buku..."
-        oninput="laporanFilterBreakdown(this.value)" autocomplete="off">
+        oninput="laporanFilterBreakdown()" autocomplete="off">
+      <input class="inp" id="lap-breakdown-pub-search" type="text" placeholder="Cari penerbit..."
+        oninput="laporanFilterBreakdown()" autocomplete="off">
     </div>
     <div class="table-wrap">
       <table class="lap-table">
@@ -465,11 +484,11 @@ function renderBookBreakdown() {
         <tbody id="lap-breakdown-tbody">${rowsHtml}</tbody>
         <tfoot>
           <tr class="lap-table-summary">
-            <td>Total (${list.length} judul)</td>
+            <td>Total (<span id="lap-breakdown-foot-count">${list.length}</span> judul)</td>
             <td></td>
-            <td style="text-align:right">${totalSatuan}</td>
-            <td style="text-align:right">${totalBundle}</td>
-            <td style="text-align:right">${totalAll}</td>
+            <td style="text-align:right" id="lap-breakdown-foot-satuan">${totalSatuan}</td>
+            <td style="text-align:right" id="lap-breakdown-foot-bundle">${totalBundle}</td>
+            <td style="text-align:right" id="lap-breakdown-foot-total">${totalAll}</td>
           </tr>
         </tfoot>
       </table>
@@ -575,12 +594,17 @@ function drawPublisherChart() {
   const list = aggregateBookBreakdown(S.sales, selectedYear, selectedMonth);
   if (list.length === 0) { canvas.style.display = 'none'; return; }
 
-  const { top, lainnya } = aggregateByPublisher(list);
-  const lainnyaQty = lainnya ? lainnya.reduce((s, x) => s + x.qty, 0) : 0;
-
-  const labels = [...top.map(t => t.publisher), ...(lainnya ? ['Lainnya'] : [])];
-  const values = [...top.map(t => t.qty),       ...(lainnya ? [lainnyaQty] : [])];
+  const pubs   = aggregateByPublisher(list);
+  const labels = pubs.map(p => p.publisher);
+  const values = pubs.map(p => p.qty);
   const total  = values.reduce((a, b) => a + b, 0) || 1;
+
+  // Auto-resize wrapper height kalau penerbit banyak — minimal 280px,
+  // tiap bar dapet ~30px supaya readable.
+  const wrap = canvas.parentElement;
+  if (wrap && wrap.classList.contains('lap-chart-wrap')) {
+    wrap.style.height = `${Math.max(280, pubs.length * 30 + 40)}px`;
+  }
 
   publisherChartInstance = new Chart(canvas, {
     type: 'bar',
@@ -607,10 +631,6 @@ function drawPublisherChart() {
               const v   = ctx.parsed.x;
               const pct = (v / total * 100).toFixed(1);
               return `${v} buku (${pct}%)`;
-            },
-            afterLabel: (ctx) => {
-              if (ctx.label !== 'Lainnya' || !lainnya) return '';
-              return lainnya.map(x => `  • ${x.publisher}: ${x.qty}`);
             },
           },
         },
