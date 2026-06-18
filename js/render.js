@@ -1070,9 +1070,12 @@ export function render() {
       </div>
 
       <div class="search-row" style="margin-bottom:10px">
-        <input class="search-input" type="text" id="po-search"
-          placeholder="Cari penerbit, judul buku..."
-          oninput="render()" value="${searchQ}" style="flex:1;min-width:180px">
+        <div class="search-input-wrap" style="flex:1;min-width:180px">
+          <input class="search-input" type="text" id="po-search"
+            placeholder="Cari penerbit, judul buku..."
+            oninput="render()" value="${searchQ}" style="width:100%">
+          <button class="search-clear-btn" onclick="clearInputField('po-search')" type="button">✕ Clear</button>
+        </div>
       </div>
 
       <div class="filter-row" style="margin-bottom:16px">
@@ -1261,11 +1264,12 @@ export function render() {
 
       <!-- Filters -->
       <div class="search-row" style="margin-bottom:12px">
-        <div style="position:relative;flex:1;min-width:180px">
+        <div class="search-input-wrap" style="flex:1;min-width:180px">
           <input class="search-input" type="text" id="cf-search"
             placeholder="Cari keterangan, kategori..."
             oninput="render()" value="${searchQ}"
             style="width:100%">
+          <button class="search-clear-btn" onclick="clearInputField('cf-search')" type="button">✕ Clear</button>
         </div>
         <select class="inp" id="cf-filter-type" onchange="render()" style="max-width:140px;font-size:13px">
           <option value="all"     ${filterType==='all'    ?'selected':''}>Semua Tipe</option>

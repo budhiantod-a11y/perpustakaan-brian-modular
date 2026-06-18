@@ -465,10 +465,16 @@ function renderBookBreakdown() {
       <div id="laporan-publisher-empty" class="lap-empty-inline" style="display:none">Chart library belum ke-load (cek koneksi CDN)</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-      <input class="inp" id="lap-breakdown-search" type="text" placeholder="Cari judul buku..."
-        oninput="laporanFilterBreakdown()" autocomplete="off">
-      <input class="inp" id="lap-breakdown-pub-search" type="text" placeholder="Cari penerbit..."
-        oninput="laporanFilterBreakdown()" autocomplete="off">
+      <div class="search-input-wrap">
+        <input class="inp" id="lap-breakdown-search" type="text" placeholder="Cari judul buku..."
+          oninput="laporanFilterBreakdown()" autocomplete="off">
+        <button class="search-clear-btn" onclick="clearInputField('lap-breakdown-search')" type="button">✕ Clear</button>
+      </div>
+      <div class="search-input-wrap">
+        <input class="inp" id="lap-breakdown-pub-search" type="text" placeholder="Cari penerbit..."
+          oninput="laporanFilterBreakdown()" autocomplete="off">
+        <button class="search-clear-btn" onclick="clearInputField('lap-breakdown-pub-search')" type="button">✕ Clear</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table class="lap-table">

@@ -100,6 +100,13 @@ Object.assign(window, {
   setStokPub(v)  { S.set.stokPub(v);  render(); },
   setStokCat(v)  { S.set.stokCat(v);  render(); },
   clearSearch()  { S.set.stokSearch(''); document.getElementById('stok-search-input').value=''; render(); },
+  clearInputField(id) {
+    const inp = document.getElementById(id);
+    if (!inp) return;
+    inp.value = '';
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.focus();
+  },
   toggleImportPanel() { S.set.showImportPanel(!S.showImportPanel); S.set.importRows([]); S.set.importDone(false); render(); },
 
   // Scanner mode setters

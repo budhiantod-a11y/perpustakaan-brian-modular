@@ -31,9 +31,10 @@ export function renderManualSaleModal() {
 
     <div style="margin-bottom:16px">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Cari buku untuk ditambahkan:</div>
-      <div style="position:relative">
+      <div class="search-input-wrap">
         <input class="inp" id="manual-cart-search-input" type="text" placeholder="Ketik judul buku..." autocomplete="off"
           oninput="manualCartSearchFilter(this.value)">
+        <button class="search-clear-btn" onclick="clearInputField('manual-cart-search-input')" type="button">✕ Clear</button>
         <div id="manual-cart-search-results" style="position:absolute;left:0;right:0;top:100%;z-index:10;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-s) var(--radius-s);display:none;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
       </div>
     </div>
@@ -762,9 +763,10 @@ export function renderBundleModal() {
 
     <div style="margin-bottom:16px">
       <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Cari buku untuk ditambahkan:</div>
-      <div style="position:relative">
+      <div class="search-input-wrap">
         <input class="inp" id="bundle-search-input" type="text" placeholder="Ketik judul buku..." autocomplete="off"
           oninput="bundleSearchFilter(this.value)">
+        <button class="search-clear-btn" onclick="clearInputField('bundle-search-input')" type="button">✕ Clear</button>
         <div id="bundle-search-results" style="position:absolute;left:0;right:0;top:100%;z-index:10;background:var(--surface);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-s) var(--radius-s);display:none;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
       </div>
     </div>
