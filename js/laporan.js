@@ -557,7 +557,7 @@ function drawChart() {
   });
 }
 
-// Doughnut chart breakdown qty per penerbit.
+// Horizontal bar chart breakdown qty per penerbit.
 // Top 9 visible; sisanya di-group jadi "Lainnya" — tooltip-nya list semua penerbit.
 function drawPublisherChart() {
   const canvas = document.getElementById('laporan-publisher-chart');
@@ -582,30 +582,31 @@ function drawPublisherChart() {
   const values = [...top.map(t => t.qty),       ...(lainnya ? [lainnyaQty] : [])];
   const total  = values.reduce((a, b) => a + b, 0) || 1;
 
-  const palette = [
-    '#16a34a','#4f46e5','#d97706','#2563eb','#dc2626',
-    '#0891b2','#db2777','#65a30d','#7c3aed','#94a3b8',
-  ];
-  const colors = labels.map((_, i) => palette[i % palette.length]);
-
   publisherChartInstance = new Chart(canvas, {
-    type: 'doughnut',
+    type: 'bar',
     data: {
       labels,
-      datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }],
+      datasets: [{
+        data: values,
+        backgroundColor: '#4f46e5cc',
+        borderColor: '#4f46e5',
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 250 },
       plugins: {
-        legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 14 } },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: (ctx) => {
-              const v   = ctx.parsed;
+              const v   = ctx.parsed.x;
               const pct = (v / total * 100).toFixed(1);
-              return `${ctx.label}: ${v} buku (${pct}%)`;
+              return `${v} buku (${pct}%)`;
             },
             afterLabel: (ctx) => {
               if (ctx.label !== 'Lainnya' || !lainnya) return '';
@@ -613,6 +614,10 @@ function drawPublisherChart() {
             },
           },
         },
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { font: { size: 11 }, precision: 0 }, grid: { color: '#f1f5f9' } },
+        y: { ticks: { font: { size: 11 }, autoSkip: false }, grid: { display: false } },
       },
     },
   });
