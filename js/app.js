@@ -244,9 +244,10 @@ Object.assign(window, {
   cfOnAdvanceChange: Cashflow.cfOnAdvanceChange,
 
   // Laporan dashboard
-  laporanSetMonth:  Laporan.setMonth,
-  laporanSetRange:  Laporan.setTrendRange,
-  laporanSetMetric: Laporan.setTrendMetric,
+  laporanSetMonth:        Laporan.setMonth,
+  laporanSetRange:        Laporan.setTrendRange,
+  laporanSetMetric:       Laporan.setTrendMetric,
+  laporanFilterBreakdown: Laporan.filterBreakdown,
 
   // Helpers
   closeModal,

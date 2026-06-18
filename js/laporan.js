@@ -85,6 +85,37 @@ export function computeDelta(current, previous) {
   return ((current - previous) / previous) * 100;
 }
 
+// Breakdown qty per buku dalam 1 bulan.
+// Non-bundle → masuk qtySatuan. Bundle → tiap bundleItems[] di-explode ke qtyBundle.
+// Return: array sorted by qtyTotal desc, lalu title asc.
+export function aggregateBookBreakdown(sales, year, month) {
+  const yyyymm = `${year}-${String(month).padStart(2, '0')}`;
+  const rows = sales.filter(s => typeof s.date === 'string' && s.date.slice(0, 7) === yyyymm);
+
+  const acc = new Map();
+  const bump = (bookId, title, qty, isBundle) => {
+    if (!bookId || !qty) return;
+    let e = acc.get(bookId);
+    if (!e) { e = { bookId, title: title || '', qtySatuan: 0, qtyBundle: 0 }; acc.set(bookId, e); }
+    if (isBundle) e.qtyBundle += qty; else e.qtySatuan += qty;
+    if (!e.title && title) e.title = title;
+  };
+
+  for (const s of rows) {
+    if (s.isBundle) {
+      if (Array.isArray(s.bundleItems)) {
+        for (const it of s.bundleItems) bump(it.bookId, it.bookTitle, it.qty || 0, true);
+      }
+    } else {
+      bump(s.bookId, s.bookTitle, s.qty || 0, false);
+    }
+  }
+
+  return [...acc.values()]
+    .map(e => ({ ...e, qtyTotal: e.qtySatuan + e.qtyBundle }))
+    .sort((a, b) => b.qtyTotal - a.qtyTotal || a.title.localeCompare(b.title));
+}
+
 // n bulan terakhir inklusif anchor, urut dari paling lama → paling baru.
 export function getMonthRange(n, anchorYear, anchorMonth) {
   const out = [];
@@ -116,6 +147,17 @@ export function setTrendRange(n) {
 export function setTrendMetric(m) {
   if (['revenue','profit','margin','units'].includes(m)) trendMetric = m;
   rerender();
+}
+
+// Filter rows breakdown by judul. Tidak rerender supaya cursor di search input gak loncat.
+export function filterBreakdown(query) {
+  const q = (query || '').toLowerCase().trim();
+  const tbody = document.getElementById('lap-breakdown-tbody');
+  if (!tbody) return;
+  for (const tr of tbody.querySelectorAll('tr')) {
+    const t = tr.getAttribute('data-title') || '';
+    tr.style.display = (!q || t.includes(q)) ? '' : 'none';
+  }
 }
 
 function rerender() {
@@ -220,6 +262,11 @@ export function renderInto(area) {
     <div class="card">
       <div class="card-title">Comparison 6 Bulan Terakhir</div>
       ${renderComparisonTable()}
+    </div>
+
+    <div class="card">
+      <div class="card-title">Breakdown Buku Terjual — ${fmtMonthFull(selectedYear, selectedMonth)}</div>
+      ${renderBookBreakdown()}
     </div>
   `;
 
@@ -346,6 +393,57 @@ function renderComparisonTable() {
           ${cellAgg('Average', avg)}
           ${cellAgg('Best',    best)}
         </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function escapeAttr(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderBookBreakdown() {
+  const list = aggregateBookBreakdown(S.sales, selectedYear, selectedMonth);
+  if (list.length === 0) {
+    return `<div class="lap-empty-inline">Belum ada penjualan bulan ini</div>`;
+  }
+  const totalSatuan = list.reduce((s, r) => s + r.qtySatuan, 0);
+  const totalBundle = list.reduce((s, r) => s + r.qtyBundle, 0);
+  const totalAll    = totalSatuan + totalBundle;
+
+  const rowsHtml = list.map(r => `
+    <tr data-title="${escapeAttr((r.title || '').toLowerCase())}">
+      <td>${escapeAttr(r.title || '(tanpa judul)')}</td>
+      <td style="text-align:right">${r.qtySatuan || '—'}</td>
+      <td style="text-align:right">${r.qtyBundle || '—'}</td>
+      <td style="text-align:right;font-weight:600">${r.qtyTotal}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div style="margin-bottom:12px">
+      <input class="inp" id="lap-breakdown-search" type="text" placeholder="Cari judul buku..."
+        oninput="laporanFilterBreakdown(this.value)" autocomplete="off">
+    </div>
+    <div class="table-wrap">
+      <table class="lap-table">
+        <thead>
+          <tr>
+            <th>Judul</th>
+            <th style="text-align:right">Satuan</th>
+            <th style="text-align:right">Bundling</th>
+            <th style="text-align:right">Total</th>
+          </tr>
+        </thead>
+        <tbody id="lap-breakdown-tbody">${rowsHtml}</tbody>
+        <tfoot>
+          <tr class="lap-table-summary">
+            <td>Total (${list.length} judul)</td>
+            <td style="text-align:right">${totalSatuan}</td>
+            <td style="text-align:right">${totalBundle}</td>
+            <td style="text-align:right">${totalAll}</td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   `;

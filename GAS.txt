@@ -96,6 +96,44 @@ function syncData(data) {
         ];
       });
 
+  // Sheet "Sales_Breakdown" — explode bundle jadi 1 row per buku
+  // Non-bundle: source="satuan", bundleId kosong
+  // Bundle:     source="bundle", 1 row per item di bundleItems
+  var breakdownRows = [];
+  (data.sales || []).forEach(function(sale) {
+    if (sale.isBundle && Array.isArray(sale.bundleItems) && sale.bundleItems.length) {
+      sale.bundleItems.forEach(function(it) {
+        breakdownRows.push({
+          date:      sale.date,
+          saleId:    sale.id,
+          bookId:    it.bookId || '',
+          bookTitle: it.bookTitle || '',
+          qty:       it.qty || 0,
+          source:    'bundle',
+          bundleId:  sale.bundleId || '',
+          note:      sale.note || ''
+        });
+      });
+    } else {
+      breakdownRows.push({
+        date:      sale.date,
+        saleId:    sale.id,
+        bookId:    sale.bookId || '',
+        bookTitle: sale.bookTitle || '',
+        qty:       sale.qty || 0,
+        source:    'satuan',
+        bundleId:  '',
+        note:      sale.note || ''
+      });
+    }
+  });
+
+  writeSheet(ss, 'Sales_Breakdown', breakdownRows, [
+    'date','saleId','bookId','bookTitle','qty','source','bundleId','note'
+  ], function(r) {
+    return [r.date, r.saleId, r.bookId, r.bookTitle, r.qty, r.source, r.bundleId, r.note];
+  });
+
   // Sheet "restocks"
   writeSheet(ss, 'restocks', data.restocks || [], [
     'id','bookId','bookTitle','qty','buyPrice','date','note'
