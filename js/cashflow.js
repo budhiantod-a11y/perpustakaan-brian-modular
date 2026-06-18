@@ -20,10 +20,11 @@ export const CATEGORIES = {
     { value: 'lainnya',     label: 'Pemasukan Lain',   canAdvance: false },
   ],
   expense: [
-    { value: 'ongkir',           label: 'Ongkir',           canAdvance: false },
-    { value: 'operasional',      label: 'Operasional',      canAdvance: false },
-    { value: 'iklan_marketing',  label: 'Iklan/Marketing',  canAdvance: false },
-    { value: 'lainnya',          label: 'Pengeluaran Lain', canAdvance: false },
+    { value: 'bayar_po',         label: 'Bayar PO/Belanja Buku', canAdvance: false },
+    { value: 'ongkir',           label: 'Ongkir',                canAdvance: false },
+    { value: 'operasional',      label: 'Operasional',           canAdvance: false },
+    { value: 'iklan_marketing',  label: 'Iklan/Marketing',       canAdvance: false },
+    { value: 'lainnya',          label: 'Pengeluaran Lain',      canAdvance: false },
   ],
 };
 
@@ -207,7 +208,8 @@ export function cfSetType(type) {
   sel.innerHTML = type === 'income'
     ? `<option value="dp_customer">DP / Uang Muka</option>
        <option value="lainnya">Pemasukan Lain</option>`
-    : `<option value="ongkir">Ongkir</option>
+    : `<option value="bayar_po">Bayar PO/Belanja Buku</option>
+       <option value="ongkir">Ongkir</option>
        <option value="operasional">Operasional</option>
        <option value="iklan_marketing">Iklan/Marketing</option>
        <option value="lainnya">Pengeluaran Lain</option>`;
@@ -269,6 +271,7 @@ export function openEditCashflow(id) {
     <option value="dp_customer" ${cf.category==='dp_customer'?'selected':''}>DP / Uang Muka</option>
     <option value="lainnya"     ${cf.category==='lainnya'&&cf.type==='income'?'selected':''}>Pemasukan Lain</option>`;
   const expenseOptions = `
+    <option value="bayar_po"         ${cf.category==='bayar_po'?'selected':''}>Bayar PO/Belanja Buku</option>
     <option value="ongkir"           ${cf.category==='ongkir'?'selected':''}>Ongkir</option>
     <option value="operasional"      ${cf.category==='operasional'?'selected':''}>Operasional</option>
     <option value="iklan_marketing"  ${cf.category==='iklan_marketing'?'selected':''}>Iklan/Marketing</option>
