@@ -20,19 +20,21 @@ export const CATEGORIES = {
     { value: 'lainnya',     label: 'Pemasukan Lain',   canAdvance: false },
   ],
   expense: [
-    { value: 'ongkir',      label: 'Ongkir',           canAdvance: false },
-    { value: 'operasional', label: 'Operasional',      canAdvance: false },
-    { value: 'lainnya',     label: 'Pengeluaran Lain', canAdvance: false },
+    { value: 'ongkir',           label: 'Ongkir',           canAdvance: false },
+    { value: 'operasional',      label: 'Operasional',      canAdvance: false },
+    { value: 'iklan_marketing',  label: 'Iklan/Marketing',  canAdvance: false },
+    { value: 'lainnya',          label: 'Pengeluaran Lain', canAdvance: false },
   ],
 };
 
 export const CATEGORY_LABELS = {
-  penjualan:    'Penjualan',
-  dp_customer:  'DP / Uang Muka',
-  lainnya:      'Lainnya',
-  bayar_po:     'Bayar PO',
-  ongkir:       'Ongkir',
-  operasional:  'Operasional',
+  penjualan:       'Penjualan',
+  dp_customer:     'DP / Uang Muka',
+  lainnya:         'Lainnya',
+  bayar_po:        'Bayar PO/Belanja Buku',
+  ongkir:          'Ongkir',
+  operasional:     'Operasional',
+  iklan_marketing: 'Iklan/Marketing',
 };
 
 // ─── Merge logic: gabungkan auto + manual entries ─────────────────────────────
@@ -207,6 +209,7 @@ export function cfSetType(type) {
        <option value="lainnya">Pemasukan Lain</option>`
     : `<option value="ongkir">Ongkir</option>
        <option value="operasional">Operasional</option>
+       <option value="iklan_marketing">Iklan/Marketing</option>
        <option value="lainnya">Pengeluaran Lain</option>`;
 
   // Show/hide advance section
@@ -266,9 +269,10 @@ export function openEditCashflow(id) {
     <option value="dp_customer" ${cf.category==='dp_customer'?'selected':''}>DP / Uang Muka</option>
     <option value="lainnya"     ${cf.category==='lainnya'&&cf.type==='income'?'selected':''}>Pemasukan Lain</option>`;
   const expenseOptions = `
-    <option value="ongkir"      ${cf.category==='ongkir'?'selected':''}>Ongkir</option>
-    <option value="operasional" ${cf.category==='operasional'?'selected':''}>Operasional</option>
-    <option value="lainnya"     ${cf.category==='lainnya'&&cf.type==='expense'?'selected':''}>Pengeluaran Lain</option>`;
+    <option value="ongkir"           ${cf.category==='ongkir'?'selected':''}>Ongkir</option>
+    <option value="operasional"      ${cf.category==='operasional'?'selected':''}>Operasional</option>
+    <option value="iklan_marketing"  ${cf.category==='iklan_marketing'?'selected':''}>Iklan/Marketing</option>
+    <option value="lainnya"          ${cf.category==='lainnya'&&cf.type==='expense'?'selected':''}>Pengeluaran Lain</option>`;
 
   openModal(`
     <h2 class="modal-title">Edit Entri Cashflow</h2>

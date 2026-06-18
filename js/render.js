@@ -1150,12 +1150,13 @@ export function render() {
 
     const categoryBadgeStyle = (cat, type) => {
       const styles = {
-        penjualan:   'background:#dcfce7;color:#16a34a',
-        dp_customer: 'background:#faf5ff;color:#7c3aed',
-        bayar_po:    'background:#fee2e2;color:#dc2626',
-        ongkir:      'background:#fff7ed;color:#c2410c',
-        operasional: 'background:#f0f9ff;color:#0369a1',
-        lainnya:     'background:#f5f5f4;color:#57534e',
+        penjualan:       'background:#dcfce7;color:#16a34a',
+        dp_customer:     'background:#faf5ff;color:#7c3aed',
+        bayar_po:        'background:#fee2e2;color:#dc2626',
+        ongkir:          'background:#fff7ed;color:#c2410c',
+        operasional:     'background:#f0f9ff;color:#0369a1',
+        iklan_marketing: 'background:#fdf4ff;color:#a21caf',
+        lainnya:         'background:#f5f5f4;color:#57534e',
       };
       return styles[cat] || (type==='income' ? 'background:#dcfce7;color:#16a34a' : 'background:#fee2e2;color:#dc2626');
     };
@@ -1275,10 +1276,11 @@ export function render() {
           <option value="all"         ${filterCat==='all'        ?'selected':''}>Semua Kategori</option>
           <option value="penjualan"   ${filterCat==='penjualan'  ?'selected':''}>Penjualan</option>
           <option value="dp_customer" ${filterCat==='dp_customer'?'selected':''}>DP / Uang Muka</option>
-          <option value="bayar_po"    ${filterCat==='bayar_po'   ?'selected':''}>Bayar PO</option>
-          <option value="ongkir"      ${filterCat==='ongkir'     ?'selected':''}>Ongkir</option>
-          <option value="operasional" ${filterCat==='operasional'?'selected':''}>Operasional</option>
-          <option value="lainnya"     ${filterCat==='lainnya'    ?'selected':''}>Lainnya</option>
+          <option value="bayar_po"        ${filterCat==='bayar_po'       ?'selected':''}>Bayar PO/Belanja Buku</option>
+          <option value="ongkir"          ${filterCat==='ongkir'         ?'selected':''}>Ongkir</option>
+          <option value="operasional"     ${filterCat==='operasional'    ?'selected':''}>Operasional</option>
+          <option value="iklan_marketing" ${filterCat==='iklan_marketing'?'selected':''}>Iklan/Marketing</option>
+          <option value="lainnya"         ${filterCat==='lainnya'        ?'selected':''}>Lainnya</option>
         </select>
       </div>
 
