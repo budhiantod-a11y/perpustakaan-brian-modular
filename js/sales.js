@@ -540,6 +540,7 @@ export function openBundleModal() {
   S.set.bundleItems([]);
   S.set.bundlePrice(0);
   S.set.bundleNote(''); renderBundleModal();
+  setTimeout(() => document.getElementById('bundle-search-input')?.focus(), 50);
 }
 
 export function renderBundleModal() {
