@@ -457,6 +457,202 @@ export function deleteSale(saleId) {
   _render();
 }
 
+// ── Edit Sale (buyPrice + finalPrice) ──────────────────────────────────────
+// Scenario A: edit cuma sale itu, batch/stok tidak ke-touch (manual edit di menu Stok)
+export function openEditSaleModal(saleId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  if (sale.isBundle) renderEditBundleModal(sale);
+  else               renderEditSaleModal(sale);
+}
+
+function renderEditSaleModal(sale) {
+  const oldFinal = sale.finalPrice || sale.finalSellPrice || 0;
+  const oldBuyP  = sale.buyPrice   || Math.round((sale.cogs || 0) / (sale.qty || 1));
+  const oldProfit = sale.profit || 0;
+
+  openModal(`
+    <div class="modal-title">✎ Edit Transaksi</div>
+
+    <div style="background:var(--accent-s);border-radius:var(--radius-s);padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.6">
+      <strong>${sale.bookTitle}</strong> · qty ${sale.qty} · ${sale.date}<br>
+      Profit lama: <strong style="color:var(--green)">${fmt(oldProfit)}</strong>
+    </div>
+
+    <div class="field">
+      <label>Harga Modal / pcs <span style="color:var(--text3);font-weight:400">(lama: ${fmt(oldBuyP)})</span></label>
+      <input class="inp" id="edit-buy-price" type="number" min="0" value="${oldBuyP}" data-qty="${sale.qty || 0}" oninput="editSalePreview()">
+    </div>
+
+    <div class="field">
+      <label>Harga Final Total <span style="color:var(--text3);font-weight:400">(lama: ${fmt(oldFinal)})</span></label>
+      <input class="inp" id="edit-final-price" type="number" min="0" value="${oldFinal}" oninput="editSalePreview()">
+    </div>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius-s);padding:10px 12px;margin:14px 0;font-size:13px">
+      Profit baru: <strong id="edit-profit-preview" style="color:var(--green);font-size:16px">${fmt(oldProfit)}</strong>
+    </div>
+
+    <div class="field">
+      <label>Catatan Perubahan <span style="color:var(--red)">*wajib</span></label>
+      <textarea class="inp" id="edit-note" rows="2" placeholder="Misal: koreksi harga modal, salah input, dll" style="resize:vertical"></textarea>
+      <div class="hint">Disimpan terpisah di kolom <code>editNote</code> · note transaksi asli tidak berubah</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick='submitEditSale(${JSON.stringify(sale.id)})'>✓ Simpan Perubahan</button>
+    </div>
+  `);
+}
+
+function renderEditBundleModal(sale) {
+  const oldFinal = sale.finalPrice || sale.finalSellPrice || 0;
+  const items = Array.isArray(sale.bundleItems) ? sale.bundleItems : [];
+
+  openModal(`
+    <div class="modal-title">✎ Edit Bundling</div>
+
+    <div style="background:var(--accent-s);border-radius:var(--radius-s);padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.6">
+      <strong>${items.length} judul</strong> · ${items.reduce((s,i)=>s+i.qty,0)} buku · ${sale.date}<br>
+      Profit lama: <strong style="color:var(--green)">${fmt(sale.profit || 0)}</strong>
+    </div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">Harga Modal / pcs per buku:</div>
+    ${items.map((it, idx) => {
+      const oldBuyP = it.buyPrice || Math.round((it.cogs || 0) / (it.qty || 1));
+      return `
+        <div class="bundle-item-row" style="flex-direction:column;align-items:stretch;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:6px">
+            <strong>${it.bookTitle}</strong>
+            <span style="color:var(--text3)">×${it.qty}</span>
+          </div>
+          <input class="inp" type="number" min="0"
+            data-edit-bundle-idx="${idx}"
+            data-qty="${it.qty || 0}"
+            value="${oldBuyP}"
+            placeholder="Modal/pcs (lama: ${fmt(oldBuyP)})"
+            oninput="editSalePreview()">
+        </div>`;
+    }).join('')}
+
+    <div class="field" style="margin-top:14px">
+      <label>Harga Bundle <span style="color:var(--text3);font-weight:400">(lama: ${fmt(oldFinal)})</span></label>
+      <input class="inp" id="edit-final-price" type="number" min="0" value="${oldFinal}" oninput="editSalePreview()">
+    </div>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius-s);padding:10px 12px;margin:14px 0;font-size:13px">
+      Total HPP baru: <strong id="edit-cogs-preview">${fmt(sale.cogs || 0)}</strong><br>
+      Profit baru: <strong id="edit-profit-preview" style="color:var(--green);font-size:16px">${fmt(sale.profit || 0)}</strong>
+    </div>
+
+    <div class="field">
+      <label>Catatan Perubahan <span style="color:var(--red)">*wajib</span></label>
+      <textarea class="inp" id="edit-note" rows="2" placeholder="Misal: koreksi harga modal, salah input, dll" style="resize:vertical"></textarea>
+      <div class="hint">Disimpan terpisah di kolom <code>editNote</code> · note transaksi asli tidak berubah</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick='submitEditSale(${JSON.stringify(sale.id)})'>✓ Simpan Perubahan</button>
+    </div>
+  `);
+}
+
+// Live preview cogs + profit saat user ketik
+export function editSalePreview() {
+  const profitEl = document.getElementById('edit-profit-preview');
+  const cogsEl   = document.getElementById('edit-cogs-preview');
+  const finalP   = +document.getElementById('edit-final-price')?.value || 0;
+
+  // Bundle case: ada cogsEl
+  if (cogsEl) {
+    const itemInputs = document.querySelectorAll('[data-edit-bundle-idx]');
+    let totalCogs = 0;
+    // Cari sale yg lagi di-edit untuk akses qty
+    // Workaround: ambil qty dari urutan items dgn lookup ke modal — kita pass via data-qty
+    itemInputs.forEach(inp => {
+      const idx = +inp.getAttribute('data-edit-bundle-idx');
+      const qty = +inp.getAttribute('data-qty') || 0;
+      const bp  = +inp.value || 0;
+      totalCogs += bp * qty;
+    });
+    if (cogsEl) cogsEl.textContent = fmt(totalCogs);
+    if (profitEl) profitEl.textContent = fmt(finalP - totalCogs);
+    return;
+  }
+
+  // Non-bundle case
+  const buyP = +document.getElementById('edit-buy-price')?.value || 0;
+  const qty  = +document.getElementById('edit-buy-price')?.getAttribute('data-qty') || 0;
+  const cogs = buyP * qty;
+  if (profitEl) profitEl.textContent = fmt(finalP * qty - cogs);
+}
+
+export function submitEditSale(saleId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale) { showToast('Transaksi tidak ditemukan', 'err'); return; }
+
+  const noteEl = document.getElementById('edit-note');
+  const editNote = (noteEl?.value || '').trim();
+  if (!editNote) { showToast('Catatan perubahan wajib diisi', 'err'); noteEl?.focus(); return; }
+
+  const newFinal = +document.getElementById('edit-final-price')?.value || 0;
+  if (newFinal <= 0) { showToast('Harga final harus > 0', 'err'); return; }
+
+  if (sale.isBundle) {
+    const items = sale.bundleItems || [];
+    const inputs = document.querySelectorAll('[data-edit-bundle-idx]');
+    let totalCogs = 0;
+    inputs.forEach(inp => {
+      const idx = +inp.getAttribute('data-edit-bundle-idx');
+      const bp  = +inp.value || 0;
+      if (items[idx]) {
+        items[idx].buyPrice = bp;
+        items[idx].cogs = bp * (items[idx].qty || 0);
+        totalCogs += items[idx].cogs;
+      }
+    });
+    sale.cogs = totalCogs;
+    sale.finalPrice = newFinal;
+    sale.finalSellPrice = newFinal;
+    sale.profit = newFinal - totalCogs;
+    const totalQty = items.reduce((s,i)=>s+(i.qty||0),0) || 1;
+    sale.buyPrice = Math.round(totalCogs / totalQty);
+  } else {
+    const newBuyP = +document.getElementById('edit-buy-price')?.value || 0;
+    if (newBuyP < 0) { showToast('Modal tidak boleh negatif', 'err'); return; }
+    sale.buyPrice = newBuyP;
+    sale.cogs = newBuyP * (sale.qty || 0);
+    sale.finalPrice = newFinal;
+    sale.finalSellPrice = newFinal;
+    sale.profit = newFinal * (sale.qty || 0) - sale.cogs;
+  }
+
+  // Append editNote dengan prefix tanggal
+  const stamp = `[${today()}] ${editNote}`;
+  sale.editNote = sale.editNote ? `${sale.editNote}\n${stamp}` : stamp;
+
+  S.save();
+  closeModal();
+  _render();
+  openStockReminderModal();
+}
+
+function openStockReminderModal() {
+  openModal(`
+    <div class="modal-title">✓ Transaksi di-update</div>
+    <div style="font-size:13px;line-height:1.6;color:var(--text2);margin-bottom:16px">
+      Perubahan harga modal/final di transaksi udah tersimpan.<br><br>
+      <strong>Reminder:</strong> kalau perubahan harga modal ini juga berlaku untuk <strong>stok yang masih ada</strong> (batch belum kejual), edit manual di menu <strong>Stok</strong> ya — sale yang udah lewat gak otomatis sync ke batch.
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Nanti</button>
+      <button class="btn btn-primary" onclick="closeModal(); goTab('stok')">Buka Menu Stok</button>
+    </div>
+  `);
+}
+
 // ── Scanner Bundle ──────────────────────────────────────────────────────────
 export function processScanBundle(code) {
   const book = S.books.find(b => b.barcode === code.trim());

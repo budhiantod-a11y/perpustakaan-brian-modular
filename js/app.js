@@ -144,6 +144,9 @@ Object.assign(window, {
   saveSaleManual:         Sales.saveSaleManual,
   deleteSale:             Sales.deleteSale,
   deleteSaleBundle:       Sales.deleteSaleBundle,
+  openEditSaleModal:      Sales.openEditSaleModal,
+  editSalePreview:        Sales.editSalePreview,
+  submitEditSale:         Sales.submitEditSale,
 
   // Bundle
   openBundleModal:    Sales.openBundleModal,

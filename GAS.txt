@@ -82,7 +82,7 @@ function syncData(data) {
   writeSheet(ss, 'sales', data.sales || [], [
         'id','bookId','bookTitle','qty','buyPrice','normalPrice','sellPrice',
         'finalPrice','finalSellPrice','cogs','profit','date','via',
-        'priceOverride','note','customer','isBundle','bundleId','bundleItems_json','groupId'
+        'priceOverride','note','customer','isBundle','bundleId','bundleItems_json','groupId','editNote'
       ], function(sale) {
         return [
           sale.id, sale.bookId || '', sale.bookTitle, sale.qty,
@@ -92,7 +92,8 @@ function syncData(data) {
           sale.priceOverride ? 'TRUE' : 'FALSE', sale.note || '',
           sale.customer || '',
           sale.isBundle ? 'TRUE' : 'FALSE', sale.bundleId || '',
-          JSON.stringify(sale.bundleItems || []), sale.groupId || ''
+          JSON.stringify(sale.bundleItems || []), sale.groupId || '',
+          sale.editNote || ''
         ];
       });
 
@@ -111,7 +112,8 @@ function syncData(data) {
           qty:       it.qty || 0,
           source:    'bundle',
           bundleId:  sale.bundleId || '',
-          note:      sale.note || ''
+          note:      sale.note || '',
+          editNote:  sale.editNote || ''
         });
       });
     } else {
@@ -123,15 +125,16 @@ function syncData(data) {
         qty:       sale.qty || 0,
         source:    'satuan',
         bundleId:  '',
-        note:      sale.note || ''
+        note:      sale.note || '',
+        editNote:  sale.editNote || ''
       });
     }
   });
 
   writeSheet(ss, 'Sales_Breakdown', breakdownRows, [
-    'date','saleId','bookId','bookTitle','qty','source','bundleId','note'
+    'date','saleId','bookId','bookTitle','qty','source','bundleId','note','editNote'
   ], function(r) {
-    return [r.date, r.saleId, r.bookId, r.bookTitle, r.qty, r.source, r.bundleId, r.note];
+    return [r.date, r.saleId, r.bookId, r.bookTitle, r.qty, r.source, r.bundleId, r.note, r.editNote];
   });
 
   // Sheet "restocks"

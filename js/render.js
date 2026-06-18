@@ -790,8 +790,11 @@ export function render() {
                       <td><strong style="color:#7c3aed">${fmt(x.finalPrice||x.finalSellPrice)}</strong></td>
                       <td style="color:var(--green);font-weight:600;white-space:nowrap">${fmt(x.profit)}</td>
                       <td><span class="badge badge-gray">${x.via}</span></td>
-                      <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.note||'—'}</td>
-                      <td><button class="btn btn-danger btn-xs" onclick='deleteSaleBundle(${JSON.stringify(x.id)})'>Hapus</button></td>
+                      <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.editNote ? 'Edit: '+x.editNote.replace(/"/g,'&quot;') : ''}">${x.editNote ? '<span style="color:var(--amber)" title="Pernah di-edit">✎ </span>' : ''}${x.note||'—'}</td>
+                      <td style="white-space:nowrap">
+                        <button class="btn btn-ghost btn-xs" title="Edit harga modal/final" onclick='openEditSaleModal(${JSON.stringify(x.id)})'>✎</button>
+                        <button class="btn btn-danger btn-xs" onclick='deleteSaleBundle(${JSON.stringify(x.id)})'>Hapus</button>
+                      </td>
                     </tr>`;
                 }
                 return `
@@ -806,7 +809,10 @@ export function render() {
                     <td style="color:var(--green);font-weight:600;white-space:nowrap">${fmt(x.profit)}</td>
                     <td><span class="badge ${x.via==='scan'?'badge-accent':'badge-gray'}">${x.via}</span></td>
                     <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.note||'—'}</td>
-                    <td><button class="btn btn-danger btn-xs" onclick='deleteSale(${JSON.stringify(x.id)})' title="Hapus transaksi & kembalikan stok">Hapus</button></td>
+                    <td style="white-space:nowrap">
+                      <button class="btn btn-ghost btn-xs" title="Edit harga modal/final" onclick='openEditSaleModal(${JSON.stringify(x.id)})'>✎</button>
+                      <button class="btn btn-danger btn-xs" onclick='deleteSale(${JSON.stringify(x.id)})' title="Hapus transaksi & kembalikan stok">Hapus</button>
+                    </td>
                   </tr>`;
               }).join('')}
             </tbody>
