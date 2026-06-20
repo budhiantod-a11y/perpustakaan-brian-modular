@@ -1135,6 +1135,7 @@ export function render() {
     const ledger  = window._cfBuildLedger  ? window._cfBuildLedger(S.period.from, S.period.to)  : [];
     const summary    = window._cfCalcSummary       ? window._cfCalcSummary(ledger)       : { totalCashIn:0, totalCashOut:0, netCashflow:0, dpPending:0 };
     const allTimeDp  = window._cfAllTimePendingDp  ? window._cfAllTimePendingDp()        : { total:0, count:0 };
+    const expenseBreakdown = window._cfExpenseBreakdown ? window._cfExpenseBreakdown(ledger) : { total:0, items:[] };
 
     const filterType = document.getElementById('cf-filter-type')?.value || 'all';
     const filterCat  = document.getElementById('cf-filter-cat')?.value  || 'all';
@@ -1262,6 +1263,25 @@ export function render() {
         <span style="font-size:11px;color:var(--text3)">Filter "DP / Uang Muka" untuk lihat detail</span>
       </div>` : ''}
 
+      ${expenseBreakdown.total > 0 ? `
+      <div class="card" style="padding:16px 18px 18px;margin-bottom:16px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <div style="font-size:13px;font-weight:700;color:var(--text2)">Breakdown Pengeluaran</div>
+          <div style="font-size:11px;color:var(--text3)">Total ${fmt(expenseBreakdown.total)} · ${expenseBreakdown.items.length} kategori</div>
+        </div>
+        <div style="position:relative;height:300px;max-width:460px;margin:8px auto 0">
+          <canvas id="cf-expense-chart"></canvas>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;margin-top:14px;font-size:11px;color:var(--text2)">
+          ${expenseBreakdown.items.map(it => `
+            <span style="display:inline-flex;align-items:center;gap:6px">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.color};flex-shrink:0"></span>
+              <span><strong>${it.label}</strong> · ${fmt(it.amount)} <span style="color:var(--text3)">(${it.pct.toFixed(1)}%)</span></span>
+            </span>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
       <!-- Filters -->
       <div class="search-row" style="margin-bottom:12px">
         <div class="search-input-wrap" style="flex:1;min-width:180px">
@@ -1319,6 +1339,8 @@ export function render() {
         * Pemasukan dari penjualan dicatat saat transaksi diproses, bukan saat dana Shopee cair.<br>
         * Entri <span style="font-size:10px;color:var(--text3)">auto</span> tidak bisa diedit — ubah langsung di tab Penjualan atau Preorder.
       </p>`;
+
+    setTimeout(() => { window._cfDrawExpenseChart?.(expenseBreakdown); }, 0);
   }
 
     // Reset scanner flag after each render

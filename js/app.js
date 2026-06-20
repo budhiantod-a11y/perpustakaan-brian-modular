@@ -36,6 +36,8 @@ window._cfBuildLedger         = Cashflow.buildLedger;
 window._cfCalcSummary         = Cashflow.calcSummary;
 window._cfCategoryLabels      = Cashflow.CATEGORY_LABELS;
 window._cfAllTimePendingDp    = Cashflow.calcAllTimePendingDp;
+window._cfExpenseBreakdown    = Cashflow.calcExpenseBreakdown;
+window._cfDrawExpenseChart    = Cashflow.drawExpenseChart;
 
 // ── goTab ────────────────────────────────────────────────────────────────────
 function goTab(tab, btn) {

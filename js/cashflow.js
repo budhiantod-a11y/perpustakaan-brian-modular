@@ -38,6 +38,15 @@ export const CATEGORY_LABELS = {
   iklan_marketing: 'Iklan/Marketing',
 };
 
+// Warna donut chart breakdown pengeluaran — match palette badge di render.js
+const EXPENSE_COLORS = {
+  bayar_po:        '#dc2626',
+  ongkir:          '#c2410c',
+  operasional:     '#0369a1',
+  iklan_marketing: '#a21caf',
+  lainnya:         '#57534e',
+};
+
 // ─── Merge logic: gabungkan auto + manual entries ─────────────────────────────
 
 export function buildLedger(dateFrom, dateTo) {
@@ -118,6 +127,141 @@ export function calcSummary(ledger) {
   const netCashflow = (totalCashIn - dpPending) - totalCashOut;
 
   return { totalCashIn, totalCashOut, netCashflow, dpPending };
+}
+
+// ─── Expense breakdown per kategori (untuk donut chart) ───────────────────────
+
+export function calcExpenseBreakdown(ledger) {
+  const byCat = {};
+  for (const e of ledger) {
+    if (e.type !== 'expense') continue;
+    byCat[e.category] = (byCat[e.category] || 0) + e.amount;
+  }
+  const total = Object.values(byCat).reduce((a, b) => a + b, 0);
+  if (total === 0) return { total: 0, items: [] };
+  const items = Object.entries(byCat)
+    .map(([cat, amount]) => ({
+      category: cat,
+      label:    CATEGORY_LABELS[cat] || cat,
+      amount,
+      pct:      (amount / total) * 100,
+      color:    EXPENSE_COLORS[cat] || '#94a3b8',
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  return { total, items };
+}
+
+// ─── Donut chart breakdown pengeluaran ────────────────────────────────────────
+
+let expenseChartInstance = null;
+
+function fmtShortRp(v) {
+  if (v >= 1_000_000) {
+    const x = v / 1_000_000;
+    return 'Rp ' + (x >= 10 ? x.toFixed(0) : x.toFixed(1).replace(/\.0$/, '')) + 'jt';
+  }
+  if (v >= 1_000) return 'Rp ' + Math.round(v / 1_000) + 'rb';
+  return 'Rp ' + v;
+}
+
+export function drawExpenseChart(breakdown) {
+  const canvas = document.getElementById('cf-expense-chart');
+  if (!canvas) return;
+  if (typeof Chart === 'undefined') return;
+  if (expenseChartInstance) { expenseChartInstance.destroy(); expenseChartInstance = null; }
+  if (!breakdown || breakdown.total === 0) return;
+
+  const items  = breakdown.items;
+  const labels = items.map(i => i.label);
+  const data   = items.map(i => i.amount);
+  const colors = items.map(i => i.color);
+
+  // Plugin: gambar label nama kategori + (pct · amount) di tengah tiap arc.
+  // Kalau slice terlalu kecil, fallback ke pct saja, atau skip kalau gak muat.
+  const slicePlugin = {
+    id: 'cfExpenseSliceLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      ctx.save();
+      meta.data.forEach((arc, i) => {
+        const item = items[i];
+        if (!item) return;
+        const p = arc.getProps(
+          ['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius'],
+          true
+        );
+        const span = p.endAngle - p.startAngle;
+        const mid  = (p.startAngle + p.endAngle) / 2;
+        const r    = (p.innerRadius + p.outerRadius) / 2;
+        const tx   = p.x + Math.cos(mid) * r;
+        const ty   = p.y + Math.sin(mid) * r;
+        // Chord width di radius tengah → kasar buat ukur ruang horizontal
+        const chord = 2 * r * Math.sin(span / 2);
+
+        ctx.fillStyle    = '#fff';
+        ctx.textAlign    = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+        const labelW = ctx.measureText(item.label).width;
+        const pctTxt = `${item.pct.toFixed(0)}% · ${fmtShortRp(item.amount)}`;
+        ctx.font = '500 10px system-ui, -apple-system, sans-serif';
+        const pctW   = ctx.measureText(pctTxt).width;
+
+        const fits = (w) => w < chord - 8;
+
+        if (fits(labelW) && fits(pctW)) {
+          ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+          ctx.fillText(item.label, tx, ty - 7);
+          ctx.font = '500 10px system-ui, -apple-system, sans-serif';
+          ctx.fillText(pctTxt, tx, ty + 7);
+        } else if (fits(labelW)) {
+          ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+          ctx.fillText(item.label, tx, ty);
+        } else if (fits(pctW)) {
+          ctx.font = '500 11px system-ui, -apple-system, sans-serif';
+          ctx.fillText(pctTxt, tx, ty);
+        } else if (item.pct >= 3) {
+          ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+          ctx.fillText(`${item.pct.toFixed(0)}%`, tx, ty);
+        }
+      });
+      ctx.restore();
+    },
+  };
+
+  expenseChartInstance = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors,
+        borderColor: '#fff',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const it = items[ctx.dataIndex];
+              return `${it.label}: ${fmt(it.amount)} (${it.pct.toFixed(1)}%)`;
+            },
+          },
+        },
+      },
+    },
+    plugins: [slicePlugin],
+  });
 }
 
 // ─── All-time DP Pending (tidak terikat periode) ───────────────────────────────
