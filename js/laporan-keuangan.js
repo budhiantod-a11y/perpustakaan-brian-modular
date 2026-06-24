@@ -78,8 +78,12 @@ export function calcArusKas() {
     }
   }
 
-  // Manual cashflows (termasuk DP customer & pinjaman/pelunasan pemilik)
+  // Manual cashflows (termasuk pinjaman/pelunasan pemilik)
+  // DP customer yang sudah delivered di-SKIP — sale auto-entry sudah cover full revenue,
+  // kalau DP delivered juga dihitung = double count (lihat diskusi spec §2).
+  // DP pending (belum delivered) tetap masuk karena cash udah masuk tapi sale belum dibuat.
   for (const cf of S.cashflows) {
+    if (cf.category === 'dp_customer' && cf.delivered === true && cf.isAdvance === false) continue;
     add(cf.date, cf.type, cf.amount || 0);
   }
 
