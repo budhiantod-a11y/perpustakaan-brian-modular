@@ -205,6 +205,22 @@ function syncData(data) {
     });
   }
 
+  // Sheet "pengaturan_laporan" — key-value, 5 field manual untuk Laporan Keuangan
+  // Hanya tulis kalau payload mengandung laporanSettings (guard mirip drafts: cegah client lama overwrite jadi kosong)
+  if (data.laporanSettings !== undefined) {
+    var s = data.laporanSettings || {};
+    var settingsRows = [
+      { key: 'cut_off_date',        value: s.cut_off_date        || '' },
+      { key: 'saldo_pembukaan_kas', value: s.saldo_pembukaan_kas || 0  },
+      { key: 'modal_awal',          value: s.modal_awal          || 0  },
+      { key: 'nama_usaha',          value: s.nama_usaha          || '' },
+      { key: 'alamat_usaha',        value: s.alamat_usaha        || '' },
+    ];
+    writeSheet(ss, 'pengaturan_laporan', settingsRows, ['key', 'value'], function(r) {
+      return [r.key, r.value];
+    });
+  }
+
   return jsonReply({
     ok: true,
     message: 'Synced '
@@ -312,9 +328,30 @@ function loadData() {
     return obj;
   });
 
+  // Sheet "pengaturan_laporan" — key-value, return sebagai object
+  var laporanSettings = {};
+  var settingsSheet = ss.getSheetByName('pengaturan_laporan');
+  if (settingsSheet) {
+    var settingsData = settingsSheet.getDataRange().getValues();
+    for (var si = 1; si < settingsData.length; si++) {
+      var key = settingsData[si][0];
+      var val = settingsData[si][1];
+      if (!key) continue;
+      // cut_off_date sering ke-auto-convert jadi Date object oleh Sheets
+      if (val instanceof Date) {
+        var y = val.getFullYear();
+        var m = ('0' + (val.getMonth()+1)).slice(-2);
+        var d = ('0' + val.getDate()).slice(-2);
+        laporanSettings[String(key)] = y + '-' + m + '-' + d;
+      } else {
+        laporanSettings[String(key)] = (val !== undefined && val !== null) ? val : '';
+      }
+    }
+  }
+
   return jsonReply({
     ok: true,
-    data: { books: books, sales: sales, restocks: restocks, preorders: preorders, cashflows: cashflows, drafts: drafts }
+    data: { books: books, sales: sales, restocks: restocks, preorders: preorders, cashflows: cashflows, drafts: drafts, laporanSettings: laporanSettings }
   });
 }
 

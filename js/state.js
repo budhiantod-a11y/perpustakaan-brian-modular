@@ -6,6 +6,9 @@
 export let books = [], sales = [], restocks = [], preorders = [], cashflows = [];
 // Drafts buku — sinkron ke Sheets via sheet "Drafts" (biar bisa lanjut di device lain)
 export let drafts = [];
+// Pengaturan Laporan Keuangan — key-value object, sinkron ke sheet "pengaturan_laporan"
+// Fields: cut_off_date, saldo_pembukaan_kas, modal_awal, nama_usaha, alamat_usaha
+export let laporanSettings = {};
 function localDate() {
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -30,6 +33,7 @@ export let manualCartItems = [];
 export const set = {
   books(v){ books=v; }, sales(v){ sales=v; }, restocks(v){ restocks=v; },
   preorders(v){ preorders=v; }, cashflows(v){ cashflows=v; }, drafts(v){ drafts=v; },
+  laporanSettings(v){ laporanSettings=v; },
   period(v){ period=v; },
   currentTab(v){ currentTab=v; }, stokSearch(v){ stokSearch=v; }, stokPub(v){ stokPub=v; },
   stokCat(v){ stokCat=v; }, searchDebounceTimer(v){ searchDebounceTimer=v; },
@@ -96,6 +100,19 @@ function sanitizeDraft(d) {
   };
 }
 
+function sanitizeLaporanSettings(s) {
+  s = s || {};
+  const num = v => Number(v) || 0;
+  const str = v => (v == null ? '' : String(v));
+  return {
+    cut_off_date:        str(s.cut_off_date),         // 'YYYY-MM-DD' atau ''
+    saldo_pembukaan_kas: num(s.saldo_pembukaan_kas),  // angka
+    modal_awal:          num(s.modal_awal),           // angka
+    nama_usaha:          str(s.nama_usaha),
+    alamat_usaha:        str(s.alamat_usaha),
+  };
+}
+
 function sanitizeCashflow(cf) {
   const fixDate = d => {
     if (!d || typeof d !== 'string') return null;
@@ -129,6 +146,7 @@ export function load() {
       preorders = (d.preorders || []).map(sanitizePreorder);
       cashflows = (d.cashflows || []).map(sanitizeCashflow);
       drafts    = (Array.isArray(d.drafts) ? d.drafts : []).map(sanitizeDraft);
+      laporanSettings = sanitizeLaporanSettings(d.laporanSettings);
       period    = d.period    || period;
       return true;
     }
@@ -138,7 +156,7 @@ export function load() {
 
 export function save() {
   try {
-    localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, period }));
+    localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, laporanSettings, period }));
   } catch(e) { console.warn('localStorage save failed'); }
   scheduleSync();
 }
@@ -177,13 +195,13 @@ export async function syncToSheets(showFeedback=false) {
   updateSyncUI('syncing');
   try {
     const res = await fetch(gsUrl, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders, cashflows, drafts } }), redirect:'follow' });
+      body: JSON.stringify({ action:'sync', data:{ books, sales, restocks, preorders, cashflows, drafts, laporanSettings } }), redirect:'follow' });
     const json = JSON.parse(await res.text());
     if (json.ok) { updateSyncUI('connected'); if(showFeedback) console.log('Sync OK'); return; }
     throw new Error(json.error);
   } catch(err) {
     try {
-      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts }));
+      const enc = encodeURIComponent(JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, laporanSettings }));
       const json2 = await (await fetch(`${gsUrl}?action=sync&payload=${enc}`, {redirect:'follow'})).json();
       if (json2.ok) { updateSyncUI('connected'); return; }
     } catch(e2) {}
@@ -225,6 +243,7 @@ export async function loadFromSheets() {
       preorders = (json.data.preorders||[]).map(sanitizePreorder);
       cashflows = (json.data.cashflows||[]).map(sanitizeCashflow);
       drafts    = (json.data.drafts||[]).map(sanitizeDraft);
+      laporanSettings = sanitizeLaporanSettings(json.data.laporanSettings);
       save(); updateSyncUI('connected'); return true;
     }
   } catch(e) {}
@@ -313,6 +332,9 @@ export async function fetchFromSheetsOnBoot() {
       // Sanitize drafts
       const sheetDrafts = (json.data.drafts||[]).map(sanitizeDraft);
 
+      // Sanitize laporanSettings (selalu dipakai — settings independen dari ada/tidaknya transaksi)
+      const sheetLaporanSettings = sanitizeLaporanSettings(json.data.laporanSettings);
+
       // Only overwrite if Sheets has data (prevent empty Sheets from wiping local data)
       if (sheetBooks.length > 0 || sheetSales.length > 0) {
         books     = sheetBooks;
@@ -321,8 +343,9 @@ export async function fetchFromSheetsOnBoot() {
         preorders = sheetPreorders;
         cashflows = sheetCashflows;
         drafts    = sheetDrafts;
+        laporanSettings = sheetLaporanSettings;
         // Save to localStorage (but scheduleSync is blocked, so won't push back to Sheets)
-        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, period })); }
+        try { localStorage.setItem(LS, JSON.stringify({ books, sales, restocks, preorders, cashflows, drafts, laporanSettings, period })); }
         catch(e) {}
       }
       bootFetching = false;
