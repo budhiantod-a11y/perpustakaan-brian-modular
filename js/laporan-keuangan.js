@@ -210,6 +210,83 @@ function aggregateLabaRugi(year, monthFrom, monthTo) {
 export function calcLabaRugi(year, month) { return aggregateLabaRugi(year, month, month); }
 export function calcLabaRugiYtd(year, untilMonth) { return aggregateLabaRugi(year, 1, untilMonth); }
 
+// ─── Neraca: snapshot live (per hari ini) ──────────────────────────────────────
+// Per spec §3. TOTAL ASET harus == TOTAL LIABILITAS + EKUITAS.
+// Filtering date >= cut_off untuk Owner Loan & Laba Ditahan (pre-cut-off sudah masuk Modal Awal).
+// DP Pending dihitung apa adanya (live state, tidak filter date).
+
+export function calcNeraca() {
+  const settings = S.laporanSettings || {};
+  const cutOff = settings.cut_off_date || '';
+  if (!cutOff) return { ok: false, reason: 'no-cutoff' };
+
+  // ── ASET ──
+  const arusKas = calcArusKas();
+  const kas = arusKas.ok && arusKas.rows.length > 0
+    ? arusKas.rows[arusKas.rows.length - 1].saldoAkhir
+    : (Number(settings.saldo_pembukaan_kas) || 0);
+  const persediaan = calcPersediaan().totalValue;
+  const totalAset = kas + persediaan;
+
+  // ── LIABILITAS ──
+  let pinjaman = 0, pelunasan = 0, dpPending = 0;
+  for (const cf of S.cashflows) {
+    if (!cf.date) continue;
+
+    // Owner loan: filter date >= cut_off (pre-cut-off sudah ter-resolved di Modal)
+    if (cf.date >= cutOff) {
+      if (cf.category === 'pinjaman_pemilik')   pinjaman  += cf.amount || 0;
+      if (cf.category === 'pelunasan_pinjaman') pelunasan += cf.amount || 0;
+    }
+
+    // DP pending: live state, semua waktu (kalau pre-cut-off masih pending = tetap liability)
+    if (cf.category === 'dp_customer' && cf.isAdvance === true && cf.delivered === false) {
+      dpPending += cf.amount || 0;
+    }
+  }
+  const utangPemilik       = pinjaman - pelunasan;
+  const uangMukaPelanggan  = dpPending;
+  const totalLiabilitas    = utangPemilik + uangMukaPelanggan;
+
+  // ── EKUITAS ──
+  const modal = Number(settings.modal_awal) || 0;
+
+  // Laba Ditahan = Σ Laba Bersih sejak cut-off (inline, supaya date filter pakai cutOff exact, bukan per bulan)
+  let revPost = 0, hppPost = 0, bebanPost = 0;
+  for (const s of S.sales) {
+    if (!s.date || s.date < cutOff) continue;
+    const rev = s.isBundle
+      ? (s.finalPrice || s.finalSellPrice || 0)
+      : (s.qty || 0) * (s.finalPrice || s.finalSellPrice || 0);
+    revPost += rev;
+    hppPost += (s.cogs || 0);
+  }
+  const BEBAN_CATEGORIES = ['ongkir', 'operasional', 'iklan_marketing', 'lainnya'];
+  for (const cf of S.cashflows) {
+    if (cf.type !== 'expense') continue;
+    if (!cf.date || cf.date < cutOff) continue;
+    if (BEBAN_CATEGORIES.includes(cf.category)) bebanPost += (cf.amount || 0);
+  }
+  const labaDitahan = revPost - hppPost - bebanPost;
+
+  const totalEkuitas    = modal + labaDitahan;
+  const totalLiabEkuitas = totalLiabilitas + totalEkuitas;
+
+  const selisih = totalAset - totalLiabEkuitas;
+  const balanced = Math.abs(selisih) < 1; // toleransi 1 rupiah (rounding)
+
+  return {
+    ok: true,
+    cutOff,
+    aset:        { kas, persediaan, total: totalAset },
+    liabilitas:  { utangPemilik, uangMukaPelanggan, total: totalLiabilitas },
+    ekuitas:     { modal, labaDitahan, total: totalEkuitas },
+    totalLiabEkuitas,
+    balanced,
+    selisih,
+  };
+}
+
 // ─── Render tab ───────────────────────────────────────────────────────────────
 
 export function renderInto(area) {
@@ -237,6 +314,113 @@ export function renderInto(area) {
     ${renderLabaRugi(curr, ytd, prev, _lrSelectedYear, _lrSelectedMonth, prevY, prevM)}
     ${renderArusKas(arusKas)}
     ${renderPersediaan(persediaan)}
+    ${renderNeraca(calcNeraca())}
+  `;
+}
+
+function renderNeraca(n) {
+  if (!n.ok) {
+    return `
+      <div class="card">
+        <div class="card-title">Neraca (Laporan Posisi Keuangan)</div>
+        <div class="page-sub" style="padding:24px 0;text-align:center">
+          📋 Isi <strong>Cut-off Date</strong> & <strong>Modal Awal</strong> di Pengaturan dulu.
+        </div>
+      </div>
+    `;
+  }
+
+  const { aset, liabilitas, ekuitas, totalLiabEkuitas, balanced, selisih } = n;
+  const todayStr = today();
+
+  const row = (label, val, opts = {}) => {
+    const { bold, indent, color } = opts;
+    const tdLabelStyle = [
+      indent ? 'padding-left:20px' : '',
+      bold ? 'font-weight:700' : '',
+      color ? `color:${color}` : '',
+    ].filter(Boolean).join(';');
+    const tdValStyle = [
+      'text-align:right',
+      bold ? 'font-weight:700' : '',
+      color ? `color:${color}` : '',
+    ].filter(Boolean).join(';');
+    return `
+      <tr>
+        <td style="${tdLabelStyle}">${label}</td>
+        <td style="${tdValStyle}">${fmt(val)}</td>
+      </tr>
+    `;
+  };
+
+  const warningHtml = balanced ? '' : `
+    <div style="padding:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:16px">
+      <strong style="color:var(--red)">⚠ Neraca tidak balance!</strong>
+      <div style="font-size:13px;margin-top:4px">
+        Selisih: <strong>${fmt(selisih)}</strong> (ASET ${selisih > 0 ? 'lebih besar' : 'lebih kecil'} dari LIABILITAS + EKUITAS).
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px">
+        Penyebab umum: Modal Awal di Pengaturan belum sesuai (acuan = Saldo Pembukaan + nilai persediaan di cut-off), atau ada transaksi pre-cut-off yang seharusnya gak masuk Laba Ditahan.
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="card">
+      <div class="card-title">Neraca (Laporan Posisi Keuangan)</div>
+      <div class="page-sub" style="margin-bottom:12px">
+        Snapshot per <strong>${todayStr}</strong>. Cut-off: <strong>${n.cutOff}</strong>. Validasi: TOTAL ASET == TOTAL LIABILITAS + EKUITAS.
+      </div>
+
+      ${warningHtml}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <!-- ASET -->
+        <div>
+          <div style="padding:8px 12px;background:#f0fdf4;border-radius:6px;font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.5px;color:var(--green)">ASET</div>
+          <table style="margin-top:8px">
+            <tbody>
+              ${row('Kas & Setara Kas', aset.kas)}
+              ${row('Persediaan Buku',  aset.persediaan)}
+              <tr><td colspan="2" style="border-top:1px solid var(--border);padding:4px"></td></tr>
+              ${row('TOTAL ASET', aset.total, { bold: true })}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- LIABILITAS + EKUITAS -->
+        <div>
+          <div style="padding:8px 12px;background:#fef2f2;border-radius:6px;font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.5px;color:var(--red)">LIABILITAS</div>
+          <table style="margin-top:8px">
+            <tbody>
+              ${row('Utang ke Pemilik',     liabilitas.utangPemilik)}
+              ${row('Uang Muka Pelanggan',  liabilitas.uangMukaPelanggan)}
+              <tr><td colspan="2" style="border-top:1px solid var(--border);padding:4px"></td></tr>
+              ${row('Total Liabilitas', liabilitas.total, { bold: true })}
+            </tbody>
+          </table>
+
+          <div style="padding:8px 12px;background:#eff6ff;border-radius:6px;font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.5px;color:var(--blue);margin-top:12px">EKUITAS</div>
+          <table style="margin-top:8px">
+            <tbody>
+              ${row('Modal Budhi',    ekuitas.modal)}
+              ${row('Laba Ditahan',   ekuitas.labaDitahan, { color: ekuitas.labaDitahan >= 0 ? 'inherit' : 'var(--red)' })}
+              <tr><td colspan="2" style="border-top:1px solid var(--border);padding:4px"></td></tr>
+              ${row('Total Ekuitas', ekuitas.total, { bold: true })}
+            </tbody>
+          </table>
+
+          <table style="margin-top:12px">
+            <tbody>
+              <tr style="background:${balanced ? '#fef9c3' : '#fef2f2'}">
+                <td style="font-weight:700;padding:8px">TOTAL LIABILITAS + EKUITAS</td>
+                <td style="text-align:right;font-weight:700;padding:8px">${fmt(totalLiabEkuitas)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   `;
 }
 
