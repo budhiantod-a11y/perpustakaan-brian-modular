@@ -23,6 +23,10 @@ let _persediaanSearch   = '';
 export function togglePersediaan()    { _persediaanExpanded = !_persediaanExpanded; _render(); }
 export function setPersediaanSearch(v){ _persediaanSearch = (v || '').toLowerCase().trim(); _render(); }
 
+// CaLK: collapsible
+let _calkExpanded = false;
+export function toggleCaLK() { _calkExpanded = !_calkExpanded; _render(); }
+
 // Laba Rugi: bulan terpilih (default = bulan current)
 let _lrSelectedYear  = null;
 let _lrSelectedMonth = null;
@@ -315,6 +319,70 @@ export function renderInto(area) {
     ${renderArusKas(arusKas)}
     ${renderPersediaan(persediaan)}
     ${renderNeraca(calcNeraca())}
+    ${renderCaLK(s, calcNeraca())}
+  `;
+}
+
+function renderCaLK(settings, neraca) {
+  const namaUsaha   = settings.nama_usaha   || '<em style="color:var(--text3)">(belum diisi)</em>';
+  const alamatUsaha = settings.alamat_usaha || '<em style="color:var(--text3)">(belum diisi)</em>';
+  const cutOff      = settings.cut_off_date || '<em style="color:var(--text3)">(belum diisi)</em>';
+  const modal       = neraca.ok ? fmt(neraca.ekuitas.modal)            : '—';
+  const kas         = neraca.ok ? fmt(neraca.aset.kas)                 : '—';
+  const persediaan  = neraca.ok ? fmt(neraca.aset.persediaan)          : '—';
+  const utangPemilik= neraca.ok ? fmt(neraca.liabilitas.utangPemilik)  : '—';
+
+  const body = !_calkExpanded ? '' : `
+    <div style="margin-top:16px;padding:16px;background:#fafafa;border-radius:8px;line-height:1.7;font-size:13px">
+      <h3 style="margin:0 0 8px 0;font-size:14px">1. Gambaran Umum Usaha</h3>
+      <p style="margin:0 0 12px 0">
+        <strong>${namaUsaha}</strong> adalah usaha mikro di bidang penjualan buku anak, berdomisili di ${alamatUsaha}.
+        Usaha dijalankan dengan model online via marketplace Shopee dan saluran WhatsApp untuk customer langsung.
+      </p>
+
+      <h3 style="margin:0 0 8px 0;font-size:14px">2. Pernyataan Kepatuhan</h3>
+      <p style="margin:0 0 12px 0">
+        Laporan keuangan ini disusun sesuai <strong>Standar Akuntansi Keuangan Entitas Mikro, Kecil, dan Menengah (SAK EMKM)</strong>
+        yang diterbitkan Ikatan Akuntan Indonesia (IAI).
+      </p>
+
+      <h3 style="margin:0 0 8px 0;font-size:14px">3. Kebijakan Akuntansi</h3>
+      <ul style="margin:0 0 12px 0;padding-left:20px">
+        <li><strong>Basis penyusunan:</strong> akrual, biaya historis.</li>
+        <li><strong>Persediaan:</strong> dinilai dengan metode <strong>FIFO (First-In, First-Out)</strong> per batch pembelian.</li>
+        <li><strong>Pengakuan pendapatan:</strong> diakui saat barang dikirim ke pelanggan (delivery basis). Pendapatan dari marketplace Shopee dicatat <strong>net</strong> (biaya admin marketplace sudah dipotong di sumber).</li>
+        <li><strong>HPP:</strong> dihitung dengan FIFO costing per transaksi penjualan.</li>
+        <li><strong>Kas:</strong> tidak ada pemisahan Piutang Marketplace dalam Neraca — saldo Shopee in-transit ditangani melalui rekonsiliasi bulanan opsional.</li>
+      </ul>
+
+      <h3 style="margin:0 0 8px 0;font-size:14px">4. Rincian Akun Signifikan</h3>
+      <ul style="margin:0 0 12px 0;padding-left:20px">
+        <li><strong>Kas &amp; Setara Kas:</strong> ${kas} — total saldo kas (rekening, tunai, e-wallet, Shopee saldo) per tanggal pelaporan.</li>
+        <li><strong>Persediaan Buku:</strong> ${persediaan} — dihitung qty × harga modal FIFO per batch.</li>
+        <li><strong>Modal Pemilik:</strong> ${modal} — setoran awal pemilik per cut-off date.</li>
+        <li><strong>Utang ke Pemilik (Owner Loan):</strong> ${utangPemilik} — pinjaman sementara dari pemilik untuk operasional/belanja stok, akan dikembalikan. Terpisah dari Modal.</li>
+      </ul>
+
+      <h3 style="margin:0 0 8px 0;font-size:14px">5. Pemisahan Kekayaan</h3>
+      <p style="margin:0">
+        Sejak <strong>${cutOff}</strong>, kekayaan usaha dipisahkan dari kekayaan pribadi pemilik melalui rekening bisnis terpisah.
+        Transaksi pre-cut-off telah ter-summarize dalam Modal Awal. Setoran/penarikan pemilik post-cut-off dicatat sebagai Utang ke Pemilik
+        (jika sementara) atau penambahan/pengurangan Modal (jika permanen).
+      </p>
+    </div>
+  `;
+
+  return `
+    <div class="card">
+      <div class="card-title">Catatan atas Laporan Keuangan (CaLK)</div>
+      <div class="page-sub" style="margin-bottom:12px">
+        Wajib SAK EMKM. Template statis + nilai dari Pengaturan & laporan di atas.
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="lkToggleCaLK()" style="width:100%">
+        ${_calkExpanded ? '▲ Sembunyikan CaLK' : '▼ Lihat CaLK lengkap'}
+      </button>
+      ${body}
+    </div>
   `;
 }
 

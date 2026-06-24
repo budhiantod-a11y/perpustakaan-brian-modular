@@ -268,6 +268,7 @@ Object.assign(window, {
   lkTogglePersediaan:     LaporanKeuangan.togglePersediaan,
   lkSetPersediaanSearch:  LaporanKeuangan.setPersediaanSearch,
   lkSetLrMonth:           LaporanKeuangan.setLrMonth,
+  lkToggleCaLK:           LaporanKeuangan.toggleCaLK,
 
   // Helpers
   closeModal,
