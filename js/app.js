@@ -267,6 +267,7 @@ Object.assign(window, {
   lkSavePengaturan:       LaporanKeuangan.savePengaturan,
   lkTogglePersediaan:     LaporanKeuangan.togglePersediaan,
   lkSetPersediaanSearch:  LaporanKeuangan.setPersediaanSearch,
+  lkSetLrMonth:           LaporanKeuangan.setLrMonth,
 
   // Helpers
   closeModal,

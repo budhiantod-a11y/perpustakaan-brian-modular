@@ -23,6 +23,24 @@ let _persediaanSearch   = '';
 export function togglePersediaan()    { _persediaanExpanded = !_persediaanExpanded; _render(); }
 export function setPersediaanSearch(v){ _persediaanSearch = (v || '').toLowerCase().trim(); _render(); }
 
+// Laba Rugi: bulan terpilih (default = bulan current)
+let _lrSelectedYear  = null;
+let _lrSelectedMonth = null;
+function ensureLrInit() {
+  if (_lrSelectedYear === null) {
+    const now = new Date();
+    _lrSelectedYear  = now.getFullYear();
+    _lrSelectedMonth = now.getMonth() + 1;
+  }
+}
+export function setLrMonth(yyyymm) {
+  if (!yyyymm || !/^\d{4}-\d{2}$/.test(yyyymm)) return;
+  const [y, m] = yyyymm.split('-');
+  _lrSelectedYear  = Number(y);
+  _lrSelectedMonth = Number(m);
+  _render();
+}
+
 const BULAN_ID_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 function fmtMonth(yyyymm) {
@@ -134,12 +152,78 @@ export function calcPersediaan() {
   return { totalValue, totalTitles, totalQty, items };
 }
 
+// ─── Laba Rugi: per periode (bulan tertentu, atau range YTD) ────────────────────
+// Per spec §2 mapping:
+//   bayar_po           → SKIP (sudah masuk HPP via FIFO)
+//   ongkir             → Beban Ongkir
+//   operasional        → Beban Operasional
+//   iklan_marketing    → Beban Iklan/Marketing
+//   lainnya (expense)  → Beban Lain-lain
+//   dp_customer        → SKIP (liability di Neraca)
+//   pinjaman_pemilik   → SKIP (liability di Neraca)
+//   pelunasan_pinjaman → SKIP (mengurangi liability di Neraca)
+
+function inPeriod(dateStr, year, monthFrom, monthTo) {
+  if (!dateStr) return false;
+  const [y, m] = dateStr.split('-');
+  const yi = Number(y), mi = Number(m);
+  if (yi !== year) return false;
+  return mi >= monthFrom && mi <= monthTo;
+}
+
+function aggregateLabaRugi(year, monthFrom, monthTo) {
+  let revenue = 0, hpp = 0;
+  let bebanOngkir = 0, bebanOperasional = 0, bebanIklan = 0, bebanLain = 0;
+  let salesCount = 0;
+
+  for (const s of S.sales) {
+    if (!inPeriod(s.date, year, monthFrom, monthTo)) continue;
+    const rev = s.isBundle
+      ? (s.finalPrice || s.finalSellPrice || 0)
+      : (s.qty || 0) * (s.finalPrice || s.finalSellPrice || 0);
+    revenue += rev;
+    hpp     += (s.cogs || 0);
+    salesCount++;
+  }
+
+  for (const cf of S.cashflows) {
+    if (cf.type !== 'expense') continue;
+    if (!inPeriod(cf.date, year, monthFrom, monthTo)) continue;
+    switch (cf.category) {
+      case 'ongkir':          bebanOngkir      += (cf.amount || 0); break;
+      case 'operasional':     bebanOperasional += (cf.amount || 0); break;
+      case 'iklan_marketing': bebanIklan       += (cf.amount || 0); break;
+      case 'lainnya':         bebanLain        += (cf.amount || 0); break;
+      // bayar_po, pelunasan_pinjaman → skip
+    }
+  }
+
+  const labaKotor  = revenue - hpp;
+  const totalBeban = bebanOngkir + bebanOperasional + bebanIklan + bebanLain;
+  const labaBersih = labaKotor - totalBeban;
+  const margin     = revenue > 0 ? (labaKotor / revenue) * 100 : 0;
+  const empty      = salesCount === 0 && totalBeban === 0;
+
+  return { revenue, hpp, labaKotor, margin, bebanOngkir, bebanOperasional, bebanIklan, bebanLain, totalBeban, labaBersih, empty };
+}
+
+export function calcLabaRugi(year, month) { return aggregateLabaRugi(year, month, month); }
+export function calcLabaRugiYtd(year, untilMonth) { return aggregateLabaRugi(year, 1, untilMonth); }
+
 // ─── Render tab ───────────────────────────────────────────────────────────────
 
 export function renderInto(area) {
+  ensureLrInit();
   const s = S.laporanSettings || {};
   const arusKas    = calcArusKas();
   const persediaan = calcPersediaan();
+
+  const curr = calcLabaRugi(_lrSelectedYear, _lrSelectedMonth);
+  const ytd  = calcLabaRugiYtd(_lrSelectedYear, _lrSelectedMonth);
+  // Bulan sebelumnya (handle year crossover)
+  let prevY = _lrSelectedYear, prevM = _lrSelectedMonth - 1;
+  if (prevM < 1) { prevM = 12; prevY--; }
+  const prev = calcLabaRugi(prevY, prevM);
 
   area.innerHTML = `
     <div class="page-hdr">
@@ -150,6 +234,7 @@ export function renderInto(area) {
     </div>
 
     ${renderPengaturan(s)}
+    ${renderLabaRugi(curr, ytd, prev, _lrSelectedYear, _lrSelectedMonth, prevY, prevM)}
     ${renderArusKas(arusKas)}
     ${renderPersediaan(persediaan)}
   `;
@@ -192,6 +277,99 @@ function renderPengaturan(s) {
       </div>
 
       <button class="btn btn-primary" onclick="lkSavePengaturan()">Simpan Pengaturan</button>
+    </div>
+  `;
+}
+
+function renderLabaRugi(curr, ytd, prev, year, month, prevY, prevM) {
+  const monthLabel    = fmtMonth(year + '-' + String(month).padStart(2, '0'));
+  const prevLabel     = fmtMonth(prevY + '-' + String(prevM).padStart(2, '0'));
+  const ytdLabel      = `YTD ${year}`;
+  const monthInputVal = year + '-' + String(month).padStart(2, '0');
+
+  // Helper: render satu cell amount (right-aligned)
+  const cell = (val, opts = {}) => {
+    const { bold, color, isPct } = opts;
+    const text = isPct ? (val.toFixed(1) + '%') : fmt(val);
+    const style = [
+      'text-align:right',
+      bold ? 'font-weight:700' : '',
+      color ? `color:${color}` : '',
+    ].filter(Boolean).join(';');
+    return `<td style="${style}">${text}</td>`;
+  };
+
+  // Row helper
+  const row = (label, c, y, p, opts = {}) => {
+    const { bold, indent, color, highlight, isPct } = opts;
+    const tdLabelStyle = [
+      indent ? 'padding-left:24px' : '',
+      bold ? 'font-weight:700' : '',
+      color ? `color:${color}` : '',
+    ].filter(Boolean).join(';');
+    const trStyle = highlight ? 'background:#fef9c3' : '';
+    return `
+      <tr style="${trStyle}">
+        <td style="${tdLabelStyle}">${label}</td>
+        ${cell(c, { bold, color, isPct })}
+        ${cell(y, { bold, color, isPct })}
+        ${cell(p, { bold, color, isPct })}
+      </tr>
+    `;
+  };
+
+  const labaBersihColor = (v) => v >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const bodyHtml = `
+    ${row('Pendapatan Penjualan', curr.revenue, ytd.revenue, prev.revenue)}
+    ${row('(-) HPP',              curr.hpp,     ytd.hpp,     prev.hpp)}
+    ${row('= LABA KOTOR',         curr.labaKotor, ytd.labaKotor, prev.labaKotor, { bold: true })}
+    ${row('Margin %',             curr.margin,  ytd.margin,  prev.margin, { indent: true, isPct: true, color: 'var(--text3)' })}
+    <tr><td colspan="4" style="padding:6px 0;border:none"></td></tr>
+    ${row('(-) Beban Ongkir',           curr.bebanOngkir,      ytd.bebanOngkir,      prev.bebanOngkir)}
+    ${row('(-) Beban Operasional',      curr.bebanOperasional, ytd.bebanOperasional, prev.bebanOperasional)}
+    ${row('(-) Beban Iklan/Marketing',  curr.bebanIklan,       ytd.bebanIklan,       prev.bebanIklan)}
+    ${row('(-) Beban Lain-lain',        curr.bebanLain,        ytd.bebanLain,        prev.bebanLain)}
+    <tr><td colspan="4" style="padding:6px 0;border:none"></td></tr>
+    ${row('= LABA BERSIH', curr.labaBersih, ytd.labaBersih, prev.labaBersih, {
+      bold: true,
+      highlight: true,
+      color: labaBersihColor(curr.labaBersih),
+    })}
+  `;
+
+  return `
+    <div class="card">
+      <div class="lap-trend-hdr">
+        <div class="card-title" style="margin:0">Laporan Laba Rugi (akrual)</div>
+        <div class="lap-month-picker">
+          <label>Bulan</label>
+          <input type="month" value="${monthInputVal}" onchange="lkSetLrMonth(this.value)">
+        </div>
+      </div>
+      <div class="page-sub" style="margin-bottom:12px">
+        Pendapatan diakui saat barang dikirim. HPP = FIFO per transaksi. Beban dari kategori cashflow (skip <code>bayar_po</code>, <code>dp_customer</code>, <code>pinjaman_pemilik</code>, <code>pelunasan_pinjaman</code>).
+      </div>
+
+      ${curr.empty ? `
+        <div class="lap-empty-banner" style="margin-bottom:12px">
+          <strong>📭 Belum ada transaksi</strong> untuk ${monthLabel}. Kolom YTD & Bulan Sblmnya tetap dihitung.
+        </div>
+      ` : ''}
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Akun</th>
+              <th style="text-align:right">${monthLabel}</th>
+              <th style="text-align:right">${ytdLabel}</th>
+              <th style="text-align:right">${prevLabel}</th>
+            </tr>
+          </thead>
+          <tbody>${bodyHtml}</tbody>
+        </table>
+      </div>
     </div>
   `;
 }
