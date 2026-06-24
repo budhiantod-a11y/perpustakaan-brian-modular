@@ -269,6 +269,9 @@ Object.assign(window, {
   lkSetPersediaanSearch:  LaporanKeuangan.setPersediaanSearch,
   lkSetLrMonth:           LaporanKeuangan.setLrMonth,
   lkToggleCaLK:           LaporanKeuangan.toggleCaLK,
+  lkOpenRekonModal:       LaporanKeuangan.openRekonModal,
+  lkSaveRekon:            LaporanKeuangan.saveRekon,
+  lkDeleteRekon:          LaporanKeuangan.deleteRekon,
 
   // Helpers
   closeModal,

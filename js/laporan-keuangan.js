@@ -11,7 +11,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import * as S from './state.js';
-import { fmt, today, showToast } from './helpers.js';
+import { fmt, today, showToast, openModal, closeModal } from './helpers.js';
 import { totalStock, avgBuy, bookInventoryValue } from './fifo.js';
 
 let _render = () => {};
@@ -26,6 +26,79 @@ export function setPersediaanSearch(v){ _persediaanSearch = (v || '').toLowerCas
 // CaLK: collapsible
 let _calkExpanded = false;
 export function toggleCaLK() { _calkExpanded = !_calkExpanded; _render(); }
+
+// Rekonsiliasi: helpers
+function findRekon(bulan) { return S.rekonsiliasi.find(r => r.bulan === bulan); }
+function currentMonth() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+export function openRekonModal(bulan) {
+  bulan = bulan || currentMonth();
+  const existing = findRekon(bulan) || { bulan, shopee_in_transit: 0, buku_in_transit: 0, note: '' };
+  openModal(`
+    <h2 class="modal-title">Rekonsiliasi ${bulan}</h2>
+    <div class="page-sub" style="margin-bottom:12px">
+      Catat dana yang masih in-transit di akhir bulan. Disimpan per bulan, bisa di-edit kapan aja.
+    </div>
+
+    <div class="field">
+      <label>Shopee in-transit (Rp)</label>
+      <input class="inp" type="number" id="rekon-shopee" value="${existing.shopee_in_transit || ''}" min="0" placeholder="Dana belum dilepas Shopee">
+      <div class="page-sub" style="font-size:11px;margin-top:4px">Cek dashboard Shopee → total saldo belum cair.</div>
+    </div>
+
+    <div class="field">
+      <label>Buku in-transit (Rp)</label>
+      <input class="inp" type="number" id="rekon-buku" value="${existing.buku_in_transit || ''}" min="0" placeholder="Nilai buku sudah dibayar tapi belum datang">
+      <div class="page-sub" style="font-size:11px;margin-top:4px">Belanja stok sudah bayar, barang belum tiba. Nol-kan bulan berikutnya saat buku masuk inventory.</div>
+    </div>
+
+    <div class="field">
+      <label>Catatan (opsional)</label>
+      <input class="inp" type="text" id="rekon-note" value="${(existing.note || '').replace(/"/g,'&quot;')}" placeholder="Selisih sisa, dst">
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      ${findRekon(bulan) ? `<button class="btn btn-ghost" style="color:var(--red)" onclick="lkDeleteRekon('${bulan}')">Hapus</button>` : ''}
+      <button class="btn btn-primary" onclick="lkSaveRekon('${bulan}')">Simpan</button>
+    </div>
+  `);
+}
+
+export function saveRekon(bulan) {
+  const shopee = Number(document.getElementById('rekon-shopee')?.value) || 0;
+  const buku   = Number(document.getElementById('rekon-buku')?.value)   || 0;
+  const note   = (document.getElementById('rekon-note')?.value || '').trim();
+
+  const entry = {
+    bulan,
+    shopee_in_transit: shopee,
+    buku_in_transit:   buku,
+    note,
+    created_at: new Date().toISOString(),
+  };
+
+  const idx = S.rekonsiliasi.findIndex(r => r.bulan === bulan);
+  if (idx >= 0) S.rekonsiliasi[idx] = entry;
+  else          S.rekonsiliasi.push(entry);
+  S.save();
+  closeModal();
+  showToast(`Rekonsiliasi ${bulan} tersimpan ✓`);
+  _render();
+}
+
+export function deleteRekon(bulan) {
+  if (!confirm(`Hapus rekonsiliasi bulan ${bulan}?`)) return;
+  const idx = S.rekonsiliasi.findIndex(r => r.bulan === bulan);
+  if (idx >= 0) S.rekonsiliasi.splice(idx, 1);
+  S.save();
+  closeModal();
+  showToast(`Rekonsiliasi ${bulan} dihapus`);
+  _render();
+}
 
 // Laba Rugi: bulan terpilih (default = bulan current)
 let _lrSelectedYear  = null;
@@ -319,7 +392,57 @@ export function renderInto(area) {
     ${renderArusKas(arusKas)}
     ${renderPersediaan(persediaan)}
     ${renderNeraca(calcNeraca())}
+    ${renderRekonsiliasi()}
     ${renderCaLK(s, calcNeraca())}
+  `;
+}
+
+function renderRekonsiliasi() {
+  const rows = [...S.rekonsiliasi].sort((a, b) => b.bulan.localeCompare(a.bulan));
+  const thisMonth = currentMonth();
+  const hasThisMonth = !!findRekon(thisMonth);
+
+  const rowsHtml = rows.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3);font-size:13px">Belum ada rekonsiliasi tercatat</td></tr>`
+    : rows.map(r => `
+        <tr>
+          <td><strong>${r.bulan}</strong></td>
+          <td style="text-align:right">${fmt(r.shopee_in_transit)}</td>
+          <td style="text-align:right">${fmt(r.buku_in_transit)}</td>
+          <td style="font-size:12px;color:var(--text3)">${r.note || '—'}</td>
+          <td style="text-align:right">
+            <button class="btn btn-ghost btn-xs" onclick="lkOpenRekonModal('${r.bulan}')">Edit</button>
+          </td>
+        </tr>
+      `).join('');
+
+  return `
+    <div class="card">
+      <div class="lap-trend-hdr">
+        <div class="card-title" style="margin:0">Rekonsiliasi End-of-Month (opsional)</div>
+        <button class="btn btn-primary btn-sm" onclick="lkOpenRekonModal('${thisMonth}')">
+          ${hasThisMonth ? `Edit Rekon ${thisMonth}` : `+ Rekon ${thisMonth}`}
+        </button>
+      </div>
+      <div class="page-sub" style="margin-bottom:12px">
+        Cocokkan saldo app vs rekening real saat akhir bulan. Input <strong>Y</strong> (Shopee dana belum cair) & <strong>Z</strong> (buku sudah dibayar belum datang). Disimpan per bulan.
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Bulan</th>
+              <th style="text-align:right">Shopee in-transit</th>
+              <th style="text-align:right">Buku in-transit</th>
+              <th>Catatan</th>
+              <th style="text-align:right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>
   `;
 }
 

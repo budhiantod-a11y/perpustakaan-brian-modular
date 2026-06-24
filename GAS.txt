@@ -221,6 +221,22 @@ function syncData(data) {
     });
   }
 
+  // Sheet "rekonsiliasi" — per bulan, histori rekon end-of-month (§5c spec)
+  // Guarded sama seperti drafts: hanya tulis kalau payload mengandung rekonsiliasi
+  if (data.rekonsiliasi !== undefined) {
+    writeSheet(ss, 'rekonsiliasi', data.rekonsiliasi || [], [
+      'bulan','shopee_in_transit','buku_in_transit','note','created_at'
+    ], function(r) {
+      return [
+        r.bulan             || '',
+        r.shopee_in_transit || 0,
+        r.buku_in_transit   || 0,
+        r.note              || '',
+        r.created_at        || ''
+      ];
+    });
+  }
+
   return jsonReply({
     ok: true,
     message: 'Synced '
@@ -349,9 +365,20 @@ function loadData() {
     }
   }
 
+  // Sheet "rekonsiliasi" — array per bulan
+  var rekonsiliasi = readSheet(ss, 'rekonsiliasi', function(row, headers) {
+    var obj = rowToObj(row, headers);
+    obj.bulan             = String(obj.bulan || '');
+    obj.shopee_in_transit = Number(obj.shopee_in_transit) || 0;
+    obj.buku_in_transit   = Number(obj.buku_in_transit)   || 0;
+    obj.note              = String(obj.note || '');
+    obj.created_at        = String(obj.created_at || '');
+    return obj;
+  });
+
   return jsonReply({
     ok: true,
-    data: { books: books, sales: sales, restocks: restocks, preorders: preorders, cashflows: cashflows, drafts: drafts, laporanSettings: laporanSettings }
+    data: { books: books, sales: sales, restocks: restocks, preorders: preorders, cashflows: cashflows, drafts: drafts, laporanSettings: laporanSettings, rekonsiliasi: rekonsiliasi }
   });
 }
 
