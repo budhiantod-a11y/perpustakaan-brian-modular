@@ -272,6 +272,7 @@ Object.assign(window, {
   lkOpenRekonModal:       LaporanKeuangan.openRekonModal,
   lkSaveRekon:            LaporanKeuangan.saveRekon,
   lkDeleteRekon:          LaporanKeuangan.deleteRekon,
+  lkPrintLaporan:         LaporanKeuangan.printLaporan,
 
   // Helpers
   closeModal,

@@ -1506,3 +1506,37 @@ tbody tr:hover { background: var(--surface2); }
   .lap-kpi-grid { grid-template-columns: 1fr 1fr; }
   .lap-toggle { padding: 5px 9px; font-size: 11px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Print / Export PDF — untuk Laporan Keuangan (fase 9)
+   User klik "Print/Export PDF" → browser print dialog → Save as PDF.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  /* Hide UI chrome — nav, sync banner, header, low pill, toast */
+  .nav-tabs, .nav-right, header, #sync-banner, #toast, .low-pill,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  /* Hide interactive controls di tab Laporan Keuangan */
+  .lk-no-print, #lk-print-btn,
+  button[onclick*="lkSavePengaturan"],
+  button[onclick*="lkTogglePersediaan"],
+  button[onclick*="lkToggleCaLK"],
+  button[onclick*="lkOpenRekonModal"],
+  input#lk-cut-off-date, input#lk-saldo-pembukaan, input#lk-modal-awal,
+  input#lk-nama-usaha, input#lk-alamat-usaha,
+  input#lk-persediaan-search, .search-clear-btn,
+  .lap-month-picker {
+    display: none !important;
+  }
+
+  /* Card-level: hide form pengaturan saat print, biarkan section laporan */
+  body { background: white; color: black; padding: 0; margin: 0; }
+  .card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; margin-bottom: 12px; padding: 12px; }
+  .card-title { font-size: 14px; font-weight: 700; }
+  table { font-size: 12px; }
+
+  /* Force CaLK & Persediaan detail tampil saat print */
+  .lk-print-show { display: block !important; }
+}

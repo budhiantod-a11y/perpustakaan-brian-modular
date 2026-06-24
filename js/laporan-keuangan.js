@@ -118,6 +118,24 @@ export function setLrMonth(yyyymm) {
   _render();
 }
 
+// Print / Export PDF — pakai browser native print dialog
+export function printLaporan() {
+  // Auto-expand collapsible sections sebelum print (biar CaLK & detail Persediaan masuk)
+  const wasPersediaanExpanded = _persediaanExpanded;
+  const wasCalkExpanded       = _calkExpanded;
+  _persediaanExpanded = true;
+  _calkExpanded       = true;
+  _render();
+  // Tunggu re-render sebentar baru trigger print
+  setTimeout(() => {
+    window.print();
+    // Restore state setelah print dialog selesai
+    _persediaanExpanded = wasPersediaanExpanded;
+    _calkExpanded       = wasCalkExpanded;
+    _render();
+  }, 250);
+}
+
 const BULAN_ID_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 function fmtMonth(yyyymm) {
@@ -385,6 +403,9 @@ export function renderInto(area) {
         <div class="page-title">Laporan Keuangan</div>
         <div class="page-sub">Sesuai SAK EMKM — basis akrual, biaya historis</div>
       </div>
+      <button class="btn btn-primary btn-sm lk-no-print" id="lk-print-btn" onclick="lkPrintLaporan()">
+        🖨️ Print / Export PDF
+      </button>
     </div>
 
     ${renderPengaturan(s)}
@@ -617,7 +638,7 @@ function renderNeraca(n) {
 
 function renderPengaturan(s) {
   return `
-    <div class="card">
+    <div class="card lk-no-print">
       <div class="card-title">Pengaturan</div>
       <div class="page-sub" style="margin-bottom:12px">
         5 field manual yang jadi acuan semua laporan. Cukup diisi sekali (atau update saat ada perubahan).
