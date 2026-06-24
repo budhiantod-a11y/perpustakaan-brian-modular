@@ -11,6 +11,10 @@ export const avgBuy = b => {
   return t ? Math.round(b.batches.reduce((s,bt)=>s+bt.remaining*bt.buyPrice,0)/t) : 0;
 };
 
+// Nilai persediaan per buku = Σ (remaining × buyPrice) across all batches (FIFO-cost).
+// Untuk Laporan Persediaan & feed ke Neraca.
+export const bookInventoryValue = b => b.batches.reduce((s, bt) => s + bt.remaining * bt.buyPrice, 0);
+
 export function fifoDeduct(bookId, qty) {
   const book = books.find(b=>b.id===bookId);
   if (qty > totalStock(book)) {

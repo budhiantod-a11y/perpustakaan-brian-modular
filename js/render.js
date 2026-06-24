@@ -13,7 +13,7 @@ export function render() {
   const _focusSnapshot = (() => {
     const el = document.activeElement;
     if (!el || !el.id) return null;
-    const trackedIds = ['cf-search', 'stok-search-input', 'po-search'];
+    const trackedIds = ['cf-search', 'stok-search-input', 'po-search', 'lk-persediaan-search'];
     if (!trackedIds.includes(el.id)) return null;
     return { id: el.id, start: el.selectionStart, end: el.selectionEnd };
   })();

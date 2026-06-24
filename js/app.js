@@ -265,6 +265,8 @@ Object.assign(window, {
 
   // Laporan Keuangan (SAK EMKM)
   lkSavePengaturan:       LaporanKeuangan.savePengaturan,
+  lkTogglePersediaan:     LaporanKeuangan.togglePersediaan,
+  lkSetPersediaanSearch:  LaporanKeuangan.setPersediaanSearch,
 
   // Helpers
   closeModal,

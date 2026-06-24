@@ -12,9 +12,16 @@
 
 import * as S from './state.js';
 import { fmt, today, showToast } from './helpers.js';
+import { totalStock, avgBuy, bookInventoryValue } from './fifo.js';
 
 let _render = () => {};
 export function init(renderFn) { _render = renderFn; }
+
+// Module-level UI state (selector state hanya hidup selama session, gak perlu di-persist)
+let _persediaanExpanded = false;
+let _persediaanSearch   = '';
+export function togglePersediaan()    { _persediaanExpanded = !_persediaanExpanded; _render(); }
+export function setPersediaanSearch(v){ _persediaanSearch = (v || '').toLowerCase().trim(); _render(); }
 
 const BULAN_ID_FULL = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
@@ -100,11 +107,39 @@ export function calcArusKas() {
   return { ok: true, saldoPembukaan, rows };
 }
 
+// ─── Persediaan: total nilai inventory (live, untuk Neraca) ────────────────────
+
+export function calcPersediaan() {
+  let totalValue = 0, totalTitles = 0, totalQty = 0;
+  const items = [];
+
+  for (const b of S.books) {
+    const qty = totalStock(b);
+    if (qty <= 0) continue;  // skip buku stok 0
+    const value = bookInventoryValue(b);
+    totalValue  += value;
+    totalQty    += qty;
+    totalTitles += 1;
+    items.push({
+      id:       b.id,
+      title:    b.title,
+      author:   b.author || '',
+      qty,
+      avgBuy:   avgBuy(b),
+      value,
+    });
+  }
+
+  items.sort((a, b) => b.value - a.value);
+  return { totalValue, totalTitles, totalQty, items };
+}
+
 // ─── Render tab ───────────────────────────────────────────────────────────────
 
 export function renderInto(area) {
   const s = S.laporanSettings || {};
-  const arusKas = calcArusKas();
+  const arusKas    = calcArusKas();
+  const persediaan = calcPersediaan();
 
   area.innerHTML = `
     <div class="page-hdr">
@@ -116,6 +151,7 @@ export function renderInto(area) {
 
     ${renderPengaturan(s)}
     ${renderArusKas(arusKas)}
+    ${renderPersediaan(persediaan)}
   `;
 }
 
@@ -224,6 +260,87 @@ function renderArusKas(arusKas) {
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>
+    </div>
+  `;
+}
+
+function renderPersediaan(p) {
+  const { totalValue, totalTitles, totalQty, items } = p;
+  const search = _persediaanSearch;
+
+  const filteredItems = search
+    ? items.filter(it => it.title.toLowerCase().includes(search) || it.author.toLowerCase().includes(search))
+    : items;
+
+  const tableHtml = !_persediaanExpanded ? '' : `
+    <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+      <div class="search-wrap" style="flex:1;position:relative">
+        <input class="inp" type="text" id="lk-persediaan-search" placeholder="Cari judul atau penulis..."
+          oninput="lkSetPersediaanSearch(this.value)" value="${search.replace(/"/g,'&quot;')}"
+          style="width:100%">
+        ${search ? `<button class="search-clear-btn" onclick="clearInputField('lk-persediaan-search')" type="button">✕ Clear</button>` : ''}
+      </div>
+      <div style="font-size:12px;color:var(--text3);white-space:nowrap">
+        ${filteredItems.length} dari ${items.length} judul
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:8px">
+      <table>
+        <thead>
+          <tr>
+            <th>Buku</th>
+            <th style="text-align:right">Qty</th>
+            <th style="text-align:right">Harga Modal Avg</th>
+            <th style="text-align:right">Total Nilai</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filteredItems.length === 0
+            ? `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text3);font-size:13px">${search ? 'Tidak ada buku cocok dengan filter' : 'Tidak ada stok buku'}</td></tr>`
+            : filteredItems.map(it => `
+              <tr>
+                <td>
+                  <div style="font-size:13px;font-weight:500">${it.title}</div>
+                  ${it.author ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${it.author}</div>` : ''}
+                </td>
+                <td style="text-align:right;font-weight:600">${it.qty}</td>
+                <td style="text-align:right;color:var(--text3);font-size:12px">${fmt(it.avgBuy)}</td>
+                <td style="text-align:right;font-weight:600">${fmt(it.value)}</td>
+              </tr>
+            `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  return `
+    <div class="card">
+      <div class="card-title">Laporan Persediaan</div>
+      <div class="page-sub" style="margin-bottom:12px">
+        Nilai inventory live (Σ qty × harga modal FIFO per batch). Feed ke baris <strong>Persediaan Buku</strong> di Neraca.
+      </div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:1;min-width:140px;padding:12px;background:#fef9c3;border-radius:8px">
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total Nilai</div>
+          <div style="font-size:18px;font-weight:700;margin-top:4px">${fmt(totalValue)}</div>
+        </div>
+        <div style="flex:1;min-width:140px;padding:12px;background:#f8fafc;border-radius:8px">
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total Judul</div>
+          <div style="font-size:18px;font-weight:700;margin-top:4px">${totalTitles}</div>
+        </div>
+        <div style="flex:1;min-width:140px;padding:12px;background:#f8fafc;border-radius:8px">
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Total Pcs</div>
+          <div style="font-size:18px;font-weight:700;margin-top:4px">${totalQty}</div>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost btn-sm" onclick="lkTogglePersediaan()" style="width:100%">
+        ${_persediaanExpanded ? '▲ Sembunyikan detail per buku' : '▼ Lihat detail per buku'}
+      </button>
+
+      ${tableHtml}
     </div>
   `;
 }
