@@ -6,6 +6,7 @@ import { fmt, today, getNormalPrice, allPubs, allCats } from './helpers.js';
 import { totalStock, fifoSim } from './fifo.js';
 import { getPoStatus, getPoTotal, getStatusLabel } from './preorder.js';
 import * as Laporan from './laporan.js';
+import * as LaporanKeuangan from './laporan-keuangan.js';
 
 export function render() {
   // Preserve focus + cursor position across re-render (search inputs that trigger render on every keystroke)
@@ -854,6 +855,12 @@ export function render() {
   // ── LAPORAN ────────────────────────────────────────────────────────────────
   if (S.currentTab === 'laporan') {
     Laporan.renderInto(area);
+    return;
+  }
+
+  // ── LAPORAN KEUANGAN (SAK EMKM) ────────────────────────────────────────────
+  if (S.currentTab === 'laporan-keuangan') {
+    LaporanKeuangan.renderInto(area);
     return;
   }
 

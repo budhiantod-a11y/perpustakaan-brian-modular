@@ -18,6 +18,7 @@ import * as Sync     from './sync.js';
 import * as Preorder from './preorder.js';
 import * as Cashflow from './cashflow.js';
 import * as Laporan  from './laporan.js';
+import * as LaporanKeuangan from './laporan-keuangan.js';
 
 // ── Initialize modules with render callback ──────────────────────────────────
 Books.init(render);
@@ -27,6 +28,7 @@ Import.init(render);
 Sync.init(render);
 Preorder.init(render);
 Cashflow.init(render);
+LaporanKeuangan.init(render);
 
 // ── Expose S to window for debug/migration access ──
 window._S = S;
@@ -45,7 +47,7 @@ function goTab(tab, btn) {
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   else {
-    const tabs = ['dashboard','stok','scanner','penjualan','restock','laporan','preorder','cashflow'];
+    const tabs = ['dashboard','stok','scanner','penjualan','restock','laporan','preorder','cashflow','laporan-keuangan'];
     document.querySelectorAll('.nav-tab')[tabs.indexOf(tab)]?.classList.add('active');
   }
   S.set.stokSearch(''); S.set.stokPub(''); S.set.stokCat('');
@@ -260,6 +262,9 @@ Object.assign(window, {
   laporanSetRange:        Laporan.setTrendRange,
   laporanSetMetric:       Laporan.setTrendMetric,
   laporanFilterBreakdown: Laporan.filterBreakdown,
+
+  // Laporan Keuangan (SAK EMKM)
+  lkSavePengaturan:       LaporanKeuangan.savePengaturan,
 
   // Helpers
   closeModal,
