@@ -16,35 +16,40 @@ export function init(renderFn) { _render = renderFn; }
 
 export const CATEGORIES = {
   income: [
-    { value: 'dp_customer', label: 'DP / Uang Muka',   canAdvance: true },
-    { value: 'lainnya',     label: 'Pemasukan Lain',   canAdvance: false },
+    { value: 'dp_customer',      label: 'DP / Uang Muka',   canAdvance: true  },
+    { value: 'pinjaman_pemilik', label: 'Pinjaman Pemilik', canAdvance: false },
+    { value: 'lainnya',          label: 'Pemasukan Lain',   canAdvance: false },
   ],
   expense: [
-    { value: 'bayar_po',         label: 'Bayar PO/Belanja Buku', canAdvance: false },
-    { value: 'ongkir',           label: 'Ongkir',                canAdvance: false },
-    { value: 'operasional',      label: 'Operasional',           canAdvance: false },
-    { value: 'iklan_marketing',  label: 'Iklan/Marketing',       canAdvance: false },
-    { value: 'lainnya',          label: 'Pengeluaran Lain',      canAdvance: false },
+    { value: 'bayar_po',            label: 'Bayar PO/Belanja Buku',     canAdvance: false },
+    { value: 'ongkir',              label: 'Ongkir',                    canAdvance: false },
+    { value: 'operasional',         label: 'Operasional',               canAdvance: false },
+    { value: 'iklan_marketing',     label: 'Iklan/Marketing',           canAdvance: false },
+    { value: 'pelunasan_pinjaman',  label: 'Pelunasan Pinjaman Pemilik', canAdvance: false },
+    { value: 'lainnya',             label: 'Pengeluaran Lain',          canAdvance: false },
   ],
 };
 
 export const CATEGORY_LABELS = {
-  penjualan:       'Penjualan',
-  dp_customer:     'DP / Uang Muka',
-  lainnya:         'Lainnya',
-  bayar_po:        'Bayar PO/Belanja Buku',
-  ongkir:          'Ongkir',
-  operasional:     'Operasional',
-  iklan_marketing: 'Iklan/Marketing',
+  penjualan:          'Penjualan',
+  dp_customer:        'DP / Uang Muka',
+  pinjaman_pemilik:   'Pinjaman Pemilik',
+  lainnya:            'Lainnya',
+  bayar_po:           'Bayar PO/Belanja Buku',
+  ongkir:             'Ongkir',
+  operasional:        'Operasional',
+  iklan_marketing:    'Iklan/Marketing',
+  pelunasan_pinjaman: 'Pelunasan Pinjaman Pemilik',
 };
 
 // Warna donut chart breakdown pengeluaran — match palette badge di render.js
 const EXPENSE_COLORS = {
-  bayar_po:        '#dc2626',
-  ongkir:          '#c2410c',
-  operasional:     '#0369a1',
-  iklan_marketing: '#a21caf',
-  lainnya:         '#57534e',
+  bayar_po:           '#dc2626',
+  ongkir:             '#c2410c',
+  operasional:        '#0369a1',
+  iklan_marketing:    '#a21caf',
+  pelunasan_pinjaman: '#1e3a8a',
+  lainnya:            '#57534e',
 };
 
 // ─── Merge logic: gabungkan auto + manual entries ─────────────────────────────
@@ -302,6 +307,7 @@ export function openAddCashflow() {
       <label>Kategori *</label>
       <select class="inp" id="cf-category" onchange="cfOnCategoryChange()">
         <option value="dp_customer">DP / Uang Muka</option>
+        <option value="pinjaman_pemilik">Pinjaman Pemilik</option>
         <option value="lainnya">Pemasukan Lain</option>
       </select>
     </div>
@@ -351,11 +357,13 @@ export function cfSetType(type) {
   const sel = document.getElementById('cf-category');
   sel.innerHTML = type === 'income'
     ? `<option value="dp_customer">DP / Uang Muka</option>
+       <option value="pinjaman_pemilik">Pinjaman Pemilik</option>
        <option value="lainnya">Pemasukan Lain</option>`
     : `<option value="bayar_po">Bayar PO/Belanja Buku</option>
        <option value="ongkir">Ongkir</option>
        <option value="operasional">Operasional</option>
        <option value="iklan_marketing">Iklan/Marketing</option>
+       <option value="pelunasan_pinjaman">Pelunasan Pinjaman Pemilik</option>
        <option value="lainnya">Pengeluaran Lain</option>`;
 
   // Show/hide advance section
@@ -412,14 +420,16 @@ export function openEditCashflow(id) {
   if (!cf) return;
 
   const incomeOptions = `
-    <option value="dp_customer" ${cf.category==='dp_customer'?'selected':''}>DP / Uang Muka</option>
-    <option value="lainnya"     ${cf.category==='lainnya'&&cf.type==='income'?'selected':''}>Pemasukan Lain</option>`;
+    <option value="dp_customer"      ${cf.category==='dp_customer'?'selected':''}>DP / Uang Muka</option>
+    <option value="pinjaman_pemilik" ${cf.category==='pinjaman_pemilik'?'selected':''}>Pinjaman Pemilik</option>
+    <option value="lainnya"          ${cf.category==='lainnya'&&cf.type==='income'?'selected':''}>Pemasukan Lain</option>`;
   const expenseOptions = `
-    <option value="bayar_po"         ${cf.category==='bayar_po'?'selected':''}>Bayar PO/Belanja Buku</option>
-    <option value="ongkir"           ${cf.category==='ongkir'?'selected':''}>Ongkir</option>
-    <option value="operasional"      ${cf.category==='operasional'?'selected':''}>Operasional</option>
-    <option value="iklan_marketing"  ${cf.category==='iklan_marketing'?'selected':''}>Iklan/Marketing</option>
-    <option value="lainnya"          ${cf.category==='lainnya'&&cf.type==='expense'?'selected':''}>Pengeluaran Lain</option>`;
+    <option value="bayar_po"            ${cf.category==='bayar_po'?'selected':''}>Bayar PO/Belanja Buku</option>
+    <option value="ongkir"              ${cf.category==='ongkir'?'selected':''}>Ongkir</option>
+    <option value="operasional"         ${cf.category==='operasional'?'selected':''}>Operasional</option>
+    <option value="iklan_marketing"     ${cf.category==='iklan_marketing'?'selected':''}>Iklan/Marketing</option>
+    <option value="pelunasan_pinjaman"  ${cf.category==='pelunasan_pinjaman'?'selected':''}>Pelunasan Pinjaman Pemilik</option>
+    <option value="lainnya"             ${cf.category==='lainnya'&&cf.type==='expense'?'selected':''}>Pengeluaran Lain</option>`;
 
   openModal(`
     <h2 class="modal-title">Edit Entri Cashflow</h2>
