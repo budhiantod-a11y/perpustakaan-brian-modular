@@ -28,7 +28,7 @@ export function fifoDeduct(bookId, qty) {
     const take = Math.min(bt.remaining, left);
     if (!take) continue;
     cogs += take*bt.buyPrice;
-    details.push({ batchDate:bt.date, buyPrice:bt.buyPrice, qty:take });
+    details.push({ batchId:bt.id, batchDate:bt.date, buyPrice:bt.buyPrice, qty:take });
     book.batches.find(b=>b.id===bt.id).remaining -= take;
     left -= take;
   }
@@ -43,7 +43,7 @@ export function fifoSim(book, qty) {
     const take = Math.min(bt.remaining, left);
     if (!take) continue;
     cogs += take*bt.buyPrice;
-    details.push({ batchDate:bt.date, buyPrice:bt.buyPrice, qty:take });
+    details.push({ batchId:bt.id, batchDate:bt.date, buyPrice:bt.buyPrice, qty:take });
     left -= take;
   }
   return { cogs, details };
@@ -64,7 +64,7 @@ export function manualDeduct(bookId, overrides) {
     if (!bt)            return { cogs:0, details:[], ok:false, reason:'Batch tidak ditemukan' };
     if (bt.remaining < ov.qty) return { cogs:0, details:[], ok:false, reason:`Batch ${bt.date||'?'} sisa ${bt.remaining} pcs, diminta ${ov.qty}` };
     cogs += ov.qty * bt.buyPrice;
-    details.push({ batchDate: bt.date, buyPrice: bt.buyPrice, qty: ov.qty });
+    details.push({ batchId: bt.id, batchDate: bt.date, buyPrice: bt.buyPrice, qty: ov.qty });
   }
   // Semua valid → deduct
   for (const ov of overrides) {
@@ -82,7 +82,7 @@ export function manualSim(book, overrides) {
     if (!bt) continue;
     cogs += ov.qty * bt.buyPrice;
     totalQty += ov.qty;
-    details.push({ batchDate: bt.date, buyPrice: bt.buyPrice, qty: ov.qty });
+    details.push({ batchId: bt.id, batchDate: bt.date, buyPrice: bt.buyPrice, qty: ov.qty });
   }
   return { cogs, details, totalQty };
 }
