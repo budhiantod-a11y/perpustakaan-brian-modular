@@ -19,6 +19,7 @@ let trendRange    = 6;          // 3 | 6 | 12
 let trendMetric   = 'revenue';  // 'revenue' | 'profit' | 'margin' | 'units'
 let chartInstance = null;
 let publisherChartInstance = null;
+let dailyChartInstance = null;
 
 function ensureInit() {
   if (selectedYear === null) {
@@ -78,6 +79,29 @@ export function aggregateMonthly(sales, year, month) {
     shopeeRevenue, nonShopeeRevenue, shopeeShare,
     txCount: rows.length, empty: false,
   };
+}
+
+// Omzet penjualan per hari di 1 bulan. Isi semua hari (termasuk 0) biar
+// timeline kontinu untuk bar chart.
+export function aggregateDailyRevenue(sales, year, month) {
+  const yyyymm = `${year}-${String(month).padStart(2, '0')}`;
+  const byDate = new Map();
+  for (const s of sales) {
+    if (typeof s.date !== 'string' || s.date.slice(0, 7) !== yyyymm) continue;
+    const rev = getRevenue(s);
+    const e = byDate.get(s.date) || { amount: 0, count: 0 };
+    e.amount += rev;
+    e.count++;
+    byDate.set(s.date, e);
+  }
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${yyyymm}-${String(d).padStart(2, '0')}`;
+    const e = byDate.get(ds) || { amount: 0, count: 0 };
+    days.push({ date: ds, day: d, amount: e.amount, count: e.count });
+  }
+  return days;
 }
 
 // Delta % current vs previous. Null kalau previous null/0 → display "—".
@@ -295,6 +319,11 @@ export function renderInto(area) {
     </div>
 
     <div class="card">
+      <div class="card-title">Omzet Penjualan Harian — ${fmtMonthFull(selectedYear, selectedMonth)}</div>
+      ${renderDailyRevenue()}
+    </div>
+
+    <div class="card">
       <div class="card-title">Comparison 6 Bulan Terakhir</div>
       ${renderComparisonTable()}
     </div>
@@ -306,7 +335,28 @@ export function renderInto(area) {
   `;
 
   // Draw chart setelah DOM in place (Chart.js butuh canvas punya layout)
-  setTimeout(() => { drawChart(); drawPublisherChart(); }, 0);
+  setTimeout(() => { drawChart(); drawPublisherChart(); drawDailyChart(); }, 0);
+}
+
+function renderDailyRevenue() {
+  const days = aggregateDailyRevenue(S.sales, selectedYear, selectedMonth);
+  const total = days.reduce((s, d) => s + d.amount, 0);
+  const activeDays = days.filter(d => d.amount > 0).length;
+  if (total === 0) {
+    return `<div class="lap-empty-inline">Belum ada penjualan bulan ini</div>`;
+  }
+  // ~32px per hari, min-width 100% biar bulan pendek tetap fit container
+  const w = days.length * 32;
+  return `
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">
+      ${activeDays} hari ada penjualan · total ${fmt(total)}
+    </div>
+    <div style="overflow-x:auto">
+      <div style="position:relative;height:260px;min-width:100%;width:${w}px">
+        <canvas id="laporan-daily-chart"></canvas>
+      </div>
+    </div>
+  `;
 }
 
 function renderKpiCard(label, val, deltaHtml, prevVal, prevFmt, colorCss) {
@@ -644,6 +694,67 @@ function drawPublisherChart() {
       scales: {
         x: { beginAtZero: true, ticks: { font: { size: 11 }, precision: 0 }, grid: { color: '#f1f5f9' } },
         y: { ticks: { font: { size: 11 }, autoSkip: false }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+// Bar chart omzet penjualan harian untuk bulan terpilih.
+function drawDailyChart() {
+  const canvas = document.getElementById('laporan-daily-chart');
+  if (!canvas) return;
+  if (typeof Chart === 'undefined') return;
+  if (dailyChartInstance) { dailyChartInstance.destroy(); dailyChartInstance = null; }
+
+  const days = aggregateDailyRevenue(S.sales, selectedYear, selectedMonth);
+  if (!days.length) return;
+
+  const labels = days.map(d => String(d.day));
+  const values = days.map(d => d.amount);
+
+  dailyChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: '#16a34acc',
+        borderColor: '#16a34a',
+        borderWidth: 1,
+        borderRadius: 3,
+        maxBarThickness: 24,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (ctx) => days[ctx[0].dataIndex].date,
+            label: (ctx) => {
+              const d = days[ctx.dataIndex];
+              return `${fmt(d.amount)} · ${d.count} trx`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, autoSkip: false, maxRotation: 0 } },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#f1f5f9' },
+          ticks: {
+            font: { size: 10 },
+            callback: (v) => {
+              if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'jt';
+              if (v >= 1_000)     return (v / 1_000).toFixed(0) + 'rb';
+              return v;
+            },
+          },
+        },
       },
     },
   });
