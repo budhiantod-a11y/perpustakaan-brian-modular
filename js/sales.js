@@ -432,32 +432,48 @@ export function deleteSale(saleId) {
   const bookName = book ? book.title : sale.bookTitle;
   const avgCogsPcs = Math.round(sale.cogs / sale.qty);
 
-  if (!confirm(`Hapus transaksi "${bookName}" (${sale.qty} pcs)?\n\nStok akan dikembalikan +${sale.qty} pcs sebagai batch baru dengan harga modal ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(avgCogsPcs)}/pcs.`)) return;
+  // Cek apakah bisa restore ke batch asal: butuh batchConsumption ada & semua batchId masih ditemukan
+  const hasBC = Array.isArray(sale.batchConsumption) && sale.batchConsumption.length > 0;
+  const canRestoreToOrigin = hasBC && book && sale.batchConsumption.every(bc =>
+    book.batches.find(b => String(b.id) === String(bc.batchId))
+  );
 
-  // Return stock as a new batch (safest approach with FIFO)
+  const confirmMsg = canRestoreToOrigin
+    ? `Hapus transaksi "${bookName}" (${sale.qty} pcs)?\n\nStok akan dikembalikan ke ${sale.batchConsumption.length} batch asal.`
+    : `Hapus transaksi "${bookName}" (${sale.qty} pcs)?\n\nStok akan dikembalikan +${sale.qty} pcs sebagai batch baru dengan harga modal ${new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(avgCogsPcs)}/pcs.`;
+
+  if (!confirm(confirmMsg)) return;
+
   if (book) {
-    book.batches.push({
-      id: uid(),
-      qty: sale.qty,
-      remaining: sale.qty,
-      buyPrice: avgCogsPcs,
-      date: today(),
-      note: `Retur dari hapus transaksi tgl ${sale.date}`
-    });
-    S.restocks.push({
-      id: uid(),
-      bookId: book.id,
-      bookTitle: book.title,
-      qty: sale.qty,
-      buyPrice: avgCogsPcs,
-      date: today(),
-      note: `Retur hapus transaksi`
-    });
+    if (canRestoreToOrigin) {
+      for (const bc of sale.batchConsumption) {
+        const bt = book.batches.find(b => String(b.id) === String(bc.batchId));
+        bt.remaining += bc.qty;
+      }
+      S.restocks.push({
+        id: uid(), bookId: book.id, bookTitle: book.title,
+        qty: sale.qty, buyPrice: avgCogsPcs, date: today(),
+        note: `Retur ke batch asal (hapus trx tgl ${sale.date})`
+      });
+    } else {
+      // Fallback: sale lama tanpa batchConsumption, atau batch asal hilang
+      book.batches.push({
+        id: uid(), qty: sale.qty, remaining: sale.qty, buyPrice: avgCogsPcs,
+        date: today(), note: `Retur dari hapus transaksi tgl ${sale.date}`
+      });
+      S.restocks.push({
+        id: uid(), bookId: book.id, bookTitle: book.title,
+        qty: sale.qty, buyPrice: avgCogsPcs, date: today(),
+        note: `Retur hapus transaksi`
+      });
+    }
   }
 
   S.set.sales(S.sales.filter(s => s.id !== saleId));
   S.save();
-  showToast(`Transaksi dihapus · stok +${sale.qty} pcs dikembalikan`);
+  showToast(canRestoreToOrigin
+    ? `Transaksi dihapus · stok dikembalikan ke ${sale.batchConsumption.length} batch asal ✓`
+    : `Transaksi dihapus · stok +${sale.qty} pcs dikembalikan`);
   _render();
 }
 
@@ -967,19 +983,38 @@ export function deleteSaleBundle(saleId) {
     ? sale.bundleItems.map(i => `${i.bookTitle} ×${i.qty}`).join(', ')
     : sale.bookTitle;
   if (!confirm(`Hapus bundling ini?\n${titlesStr}\n\nStok semua buku akan dikembalikan.`)) return;
-  // Kembalikan stok tiap item
+  // Kembalikan stok tiap item — pakai batchConsumption per-item kalau ada
+  let restoredToOrigin = 0, fallbackCount = 0;
   if (sale.bundleItems) {
     for (const item of sale.bundleItems) {
       const b = S.books.find(x => x.id === item.bookId);
-      if (b) {
-        const avgBuyP = item.buyPrice || Math.round((item.cogs||0)/(item.qty||1));
+      if (!b) continue;
+      const avgBuyP = item.buyPrice || Math.round((item.cogs||0)/(item.qty||1));
+      const hasBC = Array.isArray(item.batchConsumption) && item.batchConsumption.length > 0;
+      const canRestoreToOrigin = hasBC && item.batchConsumption.every(bc =>
+        b.batches.find(bt => String(bt.id) === String(bc.batchId))
+      );
+      if (canRestoreToOrigin) {
+        for (const bc of item.batchConsumption) {
+          const bt = b.batches.find(bt => String(bt.id) === String(bc.batchId));
+          bt.remaining += bc.qty;
+        }
+        S.restocks.push({ id:uid(), bookId:b.id, bookTitle:b.title, qty:item.qty, buyPrice:avgBuyP, date:today(), note:`Retur bundle ke batch asal (trx tgl ${sale.date})` });
+        restoredToOrigin++;
+      } else {
         b.batches.push({ id:uid(), qty:item.qty, remaining:item.qty, buyPrice:avgBuyP, date:today(), note:`Retur bundle ${sale.date}` });
         S.restocks.push({ id:uid(), bookId:b.id, bookTitle:b.title, qty:item.qty, buyPrice:avgBuyP, date:today(), note:'Retur bundling' });
+        fallbackCount++;
       }
     }
   }
   S.set.sales(S.sales.filter(s => s.id !== saleId));
   S.save();
-  showToast(`Bundle dihapus · stok dikembalikan ✓`);
+  const msg = fallbackCount === 0
+    ? `Bundle dihapus · stok dikembalikan ke batch asal ✓`
+    : restoredToOrigin === 0
+      ? `Bundle dihapus · stok dikembalikan ✓`
+      : `Bundle dihapus · ${restoredToOrigin} ke batch asal, ${fallbackCount} batch baru ✓`;
+  showToast(msg);
   _render();
 }
