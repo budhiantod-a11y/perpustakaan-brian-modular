@@ -384,14 +384,16 @@ export function saveSaleManual() {
     const book   = S.books.find(x => x.id === item.bookId);
     const normalP = getNormalPrice(book);
     const useManual = Array.isArray(item.batchOverride);
-    let cogs;
+    let cogs, details;
     if (useManual) {
       const res = manualDeduct(item.bookId, item.batchOverride);
       if (!res.ok) { showToast(`Batch "${book.title}": ${res.reason}`, 'err'); return; }
-      cogs = res.cogs;
+      cogs = res.cogs; details = res.details;
     } else {
-      cogs = fifoDeduct(item.bookId, item.qty).cogs;
+      const res = fifoDeduct(item.bookId, item.qty);
+      cogs = res.cogs; details = res.details;
     }
+    const batchConsumption = details.map(d => ({ batchId: d.batchId, qty: d.qty, buyPrice: d.buyPrice }));
     const profit   = item.qty * item.finalPrice - cogs;
     const isDiskon = item.finalPrice !== normalP;
     S.sales.push({
@@ -409,6 +411,7 @@ export function saveSaleManual() {
       priceOverride: isDiskon,
       note: item.note || '',
       customer,
+      batchConsumption,
       ...(useManual ? { batchSource: 'manual' } : {}),
       ...(groupId ? { groupId } : {}),
     });
@@ -705,9 +708,9 @@ export function confirmScanBundle() {
   let totalCogs = 0;
   const deductions = [];
   for (const item of S.scanBundleItems) {
-    const { cogs } = fifoDeduct(item.bookId, item.qty);
+    const { cogs, details } = fifoDeduct(item.bookId, item.qty);
     totalCogs += cogs;
-    deductions.push({ bookId: item.bookId, qty: item.qty, cogs });
+    deductions.push({ bookId: item.bookId, qty: item.qty, cogs, details });
   }
   const profit   = price - totalCogs;
   const bundleId = 'b_' + uid();
@@ -723,7 +726,8 @@ export function confirmScanBundle() {
     priceOverride: false, note,
     bundleItems: S.scanBundleItems.map(item => {
       const d = deductions.find(d => d.bookId === item.bookId);
-      return { bookId: item.bookId, bookTitle: item.book.title, qty: item.qty, cogs: d?.cogs||0, buyPrice: d ? Math.round(d.cogs/item.qty) : 0 };
+      const bc = (d?.details || []).map(x => ({ batchId: x.batchId, qty: x.qty, buyPrice: x.buyPrice }));
+      return { bookId: item.bookId, bookTitle: item.book.title, qty: item.qty, cogs: d?.cogs||0, buyPrice: d ? Math.round(d.cogs/item.qty) : 0, batchConsumption: bc };
     }),
   });
   showToast(`✓ Bundle ${S.scanBundleItems.length} buku · profit ${fmt(profit)}`);
@@ -905,9 +909,9 @@ export function saveBundleSale() {
   let totalCogs = 0;
   const deductions = [];
   for (const item of S.bundleItems) {
-    const { cogs } = fifoDeduct(item.bookId, item.qty);
+    const { cogs, details } = fifoDeduct(item.bookId, item.qty);
     totalCogs += cogs;
-    deductions.push({ bookId: item.bookId, qty: item.qty, cogs });
+    deductions.push({ bookId: item.bookId, qty: item.qty, cogs, details });
   }
   const profit   = S.bundlePrice - totalCogs;
   const note     = document.getElementById('bundle-note-input')?.value?.trim() || S.bundleNote || '';
@@ -938,12 +942,14 @@ export function saveBundleSale() {
     bundleItems:    S.bundleItems.map(item => {
       const b = S.books.find(x => x.id === item.bookId);
       const d = deductions.find(d => d.bookId === item.bookId);
+      const bc = (d?.details || []).map(x => ({ batchId: x.batchId, qty: x.qty, buyPrice: x.buyPrice }));
       return {
         bookId:    item.bookId,
         bookTitle: b?.title || '?',
         qty:       item.qty,
         cogs:      d?.cogs || 0,
         buyPrice:  d ? Math.round(d.cogs / item.qty) : 0,
+        batchConsumption: bc,
       };
     }),
   });
