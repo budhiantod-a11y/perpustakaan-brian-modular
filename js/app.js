@@ -38,8 +38,8 @@ window._cfBuildLedger         = Cashflow.buildLedger;
 window._cfCalcSummary         = Cashflow.calcSummary;
 window._cfCategoryLabels      = Cashflow.CATEGORY_LABELS;
 window._cfAllTimePendingDp    = Cashflow.calcAllTimePendingDp;
+window._cfIncomeBreakdown     = Cashflow.calcIncomeBreakdown;
 window._cfExpenseBreakdown    = Cashflow.calcExpenseBreakdown;
-window._cfDrawExpenseChart    = Cashflow.drawExpenseChart;
 
 // ── goTab ────────────────────────────────────────────────────────────────────
 function goTab(tab, btn) {
@@ -96,6 +96,13 @@ Object.assign(window, {
   // Period changes (used in dashboard/laporan date inputs)
   setPeriodFrom(v) { S.period.from = v; S.save(); render(); },
   setPeriodTo(v)   { S.period.to = v;   S.save(); render(); },
+
+  // Cashflow card expand toggles
+  toggleCashflowExpand(which) {
+    if (which === 'in')       S.set.cashflowExpandIn(!S.cashflowExpandIn);
+    else if (which === 'out') S.set.cashflowExpandOut(!S.cashflowExpandOut);
+    render();
+  },
 
   // Render (for handlers that call render() directly)
   render,

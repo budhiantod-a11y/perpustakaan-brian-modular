@@ -30,6 +30,7 @@ export let importRows = [], importDone = false, showImportPanel = false;
 export let bulkSalesRows = [], bulkSalesDone = false, showBulkSalesPanel = false;
 export let bundleItems = [], bundlePrice = 0, bundleNote = '';
 export let manualCartItems = [];
+export let cashflowExpandIn = false, cashflowExpandOut = false;
 
 // ── Setters (needed because only declaring module can reassign) ──────────────
 export const set = {
@@ -51,6 +52,7 @@ export const set = {
   showBulkSalesPanel(v){ showBulkSalesPanel=v; },
   bundleItems(v){ bundleItems=v; }, bundlePrice(v){ bundlePrice=v; }, bundleNote(v){ bundleNote=v; },
   manualCartItems(v){ manualCartItems=v; },
+  cashflowExpandIn(v){ cashflowExpandIn=v; }, cashflowExpandOut(v){ cashflowExpandOut=v; },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

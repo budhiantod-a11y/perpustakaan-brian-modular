@@ -1142,7 +1142,10 @@ export function render() {
     const ledger  = window._cfBuildLedger  ? window._cfBuildLedger(S.period.from, S.period.to)  : [];
     const summary    = window._cfCalcSummary       ? window._cfCalcSummary(ledger)       : { totalCashIn:0, totalCashOut:0, netCashflow:0, dpPending:0 };
     const allTimeDp  = window._cfAllTimePendingDp  ? window._cfAllTimePendingDp()        : { total:0, count:0 };
+    const incomeBreakdown  = window._cfIncomeBreakdown  ? window._cfIncomeBreakdown(ledger)  : { total:0, items:[] };
     const expenseBreakdown = window._cfExpenseBreakdown ? window._cfExpenseBreakdown(ledger) : { total:0, items:[] };
+    const expandIn  = S.cashflowExpandIn  && incomeBreakdown.total  > 0;
+    const expandOut = S.cashflowExpandOut && expenseBreakdown.total > 0;
 
     const filterType = document.getElementById('cf-filter-type')?.value || 'all';
     const filterCat  = document.getElementById('cf-filter-cat')?.value  || 'all';
@@ -1237,15 +1240,15 @@ export function render() {
 
       <!-- Summary strip -->
       <div class="stat-grid">
-        <div class="stat-card">
+        <div class="stat-card" onclick="toggleCashflowExpand('in')" style="cursor:pointer;${expandIn?'box-shadow:0 0 0 2px var(--green) inset':''}" title="Klik untuk lihat breakdown pemasukan">
           <div class="stat-icon" style="background:#dcfce7">💰</div>
-          <div class="stat-label">Total Cash In</div>
+          <div class="stat-label">Total Cash In <span style="font-size:10px;color:var(--text3);margin-left:4px">${expandIn?'▾':'▸'}</span></div>
           <div class="stat-value" style="color:var(--green)">${fmt(summary.totalCashIn)}</div>
           <div class="stat-sub">Termasuk DP pending</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" onclick="toggleCashflowExpand('out')" style="cursor:pointer;${expandOut?'box-shadow:0 0 0 2px var(--red) inset':''}" title="Klik untuk lihat breakdown pengeluaran">
           <div class="stat-icon" style="background:#fee2e2">💸</div>
-          <div class="stat-label">Total Cash Out</div>
+          <div class="stat-label">Total Cash Out <span style="font-size:10px;color:var(--text3);margin-left:4px">${expandOut?'▾':'▸'}</span></div>
           <div class="stat-value" style="color:var(--red)">${fmt(summary.totalCashOut)}</div>
           <div class="stat-sub">Semua pengeluaran</div>
         </div>
@@ -1272,21 +1275,44 @@ export function render() {
         <span style="font-size:11px;color:var(--text3)">Filter "DP / Uang Muka" untuk lihat detail</span>
       </div>` : ''}
 
-      ${expenseBreakdown.total > 0 ? `
-      <div class="card" style="padding:16px 18px 18px;margin-bottom:16px">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+      ${expandIn ? `
+      <div class="card" style="padding:14px 16px;margin-bottom:16px;border-left:4px solid var(--green)">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <div style="font-size:13px;font-weight:700;color:var(--text2)">Breakdown Pemasukan</div>
+          <div style="font-size:11px;color:var(--text3)">Total ${fmt(incomeBreakdown.total)} · ${incomeBreakdown.items.length} kategori</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${incomeBreakdown.items.map(it => `
+            <div>
+              <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:3px">
+                <span style="color:var(--text2)">${it.label}</span>
+                <span><strong>${fmt(it.amount)}</strong> <span style="color:var(--text3)">(${it.pct.toFixed(1)}%)</span></span>
+              </div>
+              <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${it.pct}%;background:var(--green);border-radius:3px"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
+      ${expandOut ? `
+      <div class="card" style="padding:14px 16px;margin-bottom:16px;border-left:4px solid var(--red)">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
           <div style="font-size:13px;font-weight:700;color:var(--text2)">Breakdown Pengeluaran</div>
           <div style="font-size:11px;color:var(--text3)">Total ${fmt(expenseBreakdown.total)} · ${expenseBreakdown.items.length} kategori</div>
         </div>
-        <div style="position:relative;height:300px;max-width:460px;margin:8px auto 0">
-          <canvas id="cf-expense-chart"></canvas>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px 16px;margin-top:14px;font-size:11px;color:var(--text2)">
+        <div style="display:flex;flex-direction:column;gap:8px">
           ${expenseBreakdown.items.map(it => `
-            <span style="display:inline-flex;align-items:center;gap:6px">
-              <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${it.color};flex-shrink:0"></span>
-              <span><strong>${it.label}</strong> · ${fmt(it.amount)} <span style="color:var(--text3)">(${it.pct.toFixed(1)}%)</span></span>
-            </span>
+            <div>
+              <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:3px">
+                <span style="color:var(--text2)">${it.label}</span>
+                <span><strong>${fmt(it.amount)}</strong> <span style="color:var(--text3)">(${it.pct.toFixed(1)}%)</span></span>
+              </div>
+              <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${it.pct}%;background:var(--red);border-radius:3px"></div>
+              </div>
+            </div>
           `).join('')}
         </div>
       </div>` : ''}
@@ -1351,7 +1377,6 @@ export function render() {
         * Entri <span style="font-size:10px;color:var(--text3)">auto</span> tidak bisa diedit — ubah langsung di tab Penjualan atau Preorder.
       </p>`;
 
-    setTimeout(() => { window._cfDrawExpenseChart?.(expenseBreakdown); }, 0);
   }
 
     // Reset scanner flag after each render
