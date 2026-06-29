@@ -82,7 +82,8 @@ function syncData(data) {
   writeSheet(ss, 'sales', data.sales || [], [
         'id','bookId','bookTitle','qty','buyPrice','normalPrice','sellPrice',
         'finalPrice','finalSellPrice','cogs','profit','date','via',
-        'priceOverride','note','customer','isBundle','bundleId','bundleItems_json','groupId','editNote'
+        'priceOverride','note','customer','isBundle','bundleId','bundleItems_json','groupId','editNote',
+        'batchConsumption_json'
       ], function(sale) {
         return [
           sale.id, sale.bookId || '', sale.bookTitle, sale.qty,
@@ -93,7 +94,8 @@ function syncData(data) {
           sale.customer || '',
           sale.isBundle ? 'TRUE' : 'FALSE', sale.bundleId || '',
           JSON.stringify(sale.bundleItems || []), sale.groupId || '',
-          sale.editNote || ''
+          sale.editNote || '',
+          sale.batchConsumption ? JSON.stringify(sale.batchConsumption) : ''
         ];
       });
 
@@ -279,6 +281,11 @@ function loadData() {
     obj.isBundle       = obj.isBundle === 'TRUE';
     try { obj.bundleItems = JSON.parse(obj.bundleItems_json || '[]'); } catch(e) { obj.bundleItems = []; }
     delete obj.bundleItems_json;
+    try {
+      var bc = obj.batchConsumption_json;
+      obj.batchConsumption = (bc === '' || bc == null) ? null : JSON.parse(bc);
+    } catch(e) { obj.batchConsumption = null; }
+    delete obj.batchConsumption_json;
     return obj;
   });
 
