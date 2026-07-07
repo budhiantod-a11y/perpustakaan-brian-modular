@@ -1018,3 +1018,291 @@ export function deleteSaleBundle(saleId) {
   showToast(msg);
   _render();
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RETUR — track per-item qty balik/hilang tanpa hapus sale asli
+// Retur disimpan inline di sale.returLog[]. Cashflow entry auto-source
+// di-generate on-the-fly di cashflow.js (bukan di-push ke S.cashflows).
+// ═══════════════════════════════════════════════════════════════════════════
+
+function _returItemsOf(sale) {
+  return sale.isBundle
+    ? (sale.bundleItems || []).map(it => ({
+        bookId:    it.bookId,
+        bookTitle: it.bookTitle,
+        qty:       it.qty,
+        cogs:      it.cogs || 0,
+        batchConsumption: Array.isArray(it.batchConsumption) ? it.batchConsumption : [],
+      }))
+    : [{
+        bookId:    sale.bookId,
+        bookTitle: sale.bookTitle,
+        qty:       sale.qty,
+        cogs:      sale.cogs || 0,
+        batchConsumption: Array.isArray(sale.batchConsumption) ? sale.batchConsumption : [],
+      }];
+}
+
+function _qtySisa(sale, bookId) {
+  const it = _returItemsOf(sale).find(x => String(x.bookId) === String(bookId));
+  if (!it) return 0;
+  const done = (sale.returLog || [])
+    .filter(r => String(r.bookId) === String(bookId))
+    .reduce((s, r) => s + (r.qty || 0), 0);
+  return it.qty - done;
+}
+
+function _pricePerPcs(sale, bookId) {
+  if (sale.isBundle) {
+    const totalQty = (sale.bundleItems || []).reduce((s, it) => s + (it.qty || 0), 0);
+    const finalP   = sale.finalPrice || sale.finalSellPrice || 0;
+    return totalQty > 0 ? Math.round(finalP / totalQty) : 0;
+  }
+  return sale.finalPrice || sale.finalSellPrice || 0;
+}
+
+function _cogsPerPcs(sale, bookId) {
+  const it = _returItemsOf(sale).find(x => String(x.bookId) === String(bookId));
+  if (!it) return 0;
+  return Math.round((it.cogs || 0) / (it.qty || 1));
+}
+
+export function openReturModal(saleId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale) return;
+
+  const items = _returItemsOf(sale).map(it => ({ ...it, qtySisa: _qtySisa(sale, it.bookId) }));
+  const returable = items.filter(it => it.qtySisa > 0);
+  if (returable.length === 0) {
+    showToast('Semua qty di transaksi ini sudah di-retur', 'err');
+    return;
+  }
+
+  const selected = returable[0];
+  const defaultRefund = selected.qtySisa * _pricePerPcs(sale, selected.bookId);
+  const titleInfo = sale.isBundle
+    ? `Bundle · ${sale.date} · ${items.length} judul`
+    : `${sale.bookTitle} · ${sale.date}`;
+
+  const historyHtml = (sale.returLog || []).length === 0 ? '' : `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--radius-s);padding:8px 12px;margin-bottom:12px;font-size:12px">
+      <strong style="color:var(--orange)">↩ Riwayat retur (${sale.returLog.length}):</strong>
+      ${sale.returLog.map(r => `
+        <div style="margin-top:4px;color:var(--text2)">
+          • ${r.date} · ${r.bookTitle} ×${r.qty} · ${r.returnedToStock ? '📦 balik stok' : '💸 hilang'} · refund ${fmt(r.refundAmount)}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  openModal(`
+    <div class="modal-title">↩ Retur Penjualan</div>
+    <div style="background:var(--accent-s);border-radius:var(--radius-s);padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.6">
+      ${titleInfo}
+    </div>
+    ${historyHtml}
+
+    ${returable.length > 1 ? `
+      <div class="field">
+        <label>Buku yg di-retur *</label>
+        <select class="inp" id="retur-book-id" onchange='returOnItemChange(${JSON.stringify(saleId)})'>
+          ${returable.map(it => `
+            <option value="${it.bookId}" ${String(it.bookId) === String(selected.bookId) ? 'selected' : ''}>
+              ${it.bookTitle} (sisa ${it.qtySisa}/${it.qty})
+            </option>
+          `).join('')}
+        </select>
+      </div>
+    ` : `
+      <input type="hidden" id="retur-book-id" value="${selected.bookId}">
+      <div class="field">
+        <label>Buku</label>
+        <div style="padding:8px 12px;background:var(--bg);border-radius:6px;font-weight:500;font-size:13px">
+          ${selected.bookTitle} <span style="color:var(--text3);font-weight:400">(sisa ${selected.qtySisa}/${selected.qty})</span>
+        </div>
+      </div>
+    `}
+
+    <div class="field">
+      <label>Qty Retur * <span style="color:var(--text3);font-weight:400" id="retur-qty-hint">(max ${selected.qtySisa})</span></label>
+      <input class="inp" type="number" id="retur-qty" min="1" max="${selected.qtySisa}" value="${selected.qtySisa}"
+        oninput='returPreviewRefund(${JSON.stringify(saleId)})'>
+    </div>
+
+    <div class="field">
+      <label>Status Buku *</label>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="retur-status-back"
+          class="btn btn-primary btn-sm" style="flex:1"
+          onclick="returSetStatus('back')">
+          📦 Balik ke Stok
+        </button>
+        <button type="button" id="retur-status-lost"
+          class="btn btn-ghost btn-sm" style="flex:1"
+          onclick="returSetStatus('lost')">
+          💸 Hilang/Rusak
+        </button>
+      </div>
+      <input type="hidden" id="retur-status" value="back">
+      <div class="hint" style="font-size:11px;margin-top:4px;color:var(--text3)">
+        Balik: stok & HPP kembali ke inventory · Hilang: full refund jadi loss (HPP tetap kepotong)
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Refund ke Customer (Rp) *</label>
+      <input class="inp" type="number" id="retur-refund" min="1" value="${defaultRefund}">
+    </div>
+
+    <div class="field">
+      <label>Tanggal Retur *</label>
+      <input class="inp" type="date" id="retur-date" value="${today()}" max="${today()}">
+    </div>
+
+    <div class="field">
+      <label>Catatan *</label>
+      <textarea class="inp" id="retur-note" rows="2" placeholder="Alasan retur (rusak, salah pesan, dll)" style="resize:vertical"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn btn-primary" onclick='saveRetur(${JSON.stringify(saleId)})'>✓ Simpan Retur</button>
+    </div>
+  `);
+}
+
+export function returOnItemChange(saleId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const bookIdRaw = document.getElementById('retur-book-id')?.value;
+  const bookId    = Number(bookIdRaw) || bookIdRaw;
+  const qtySisa   = _qtySisa(sale, bookId);
+  const qtyInput  = document.getElementById('retur-qty');
+  const qtyHint   = document.getElementById('retur-qty-hint');
+  if (qtyInput) {
+    qtyInput.max   = qtySisa;
+    qtyInput.value = qtySisa;
+  }
+  if (qtyHint) qtyHint.textContent = `(max ${qtySisa})`;
+  returPreviewRefund(saleId);
+}
+
+export function returPreviewRefund(saleId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale) return;
+  const bookIdRaw = document.getElementById('retur-book-id')?.value;
+  const bookId    = Number(bookIdRaw) || bookIdRaw;
+  const qty       = Number(document.getElementById('retur-qty')?.value) || 0;
+  const refund    = qty * _pricePerPcs(sale, bookId);
+  const refundEl  = document.getElementById('retur-refund');
+  if (refundEl) refundEl.value = refund;
+}
+
+export function returSetStatus(status) {
+  const val = status === 'back' ? 'back' : 'lost';
+  document.getElementById('retur-status').value = val;
+  const backBtn = document.getElementById('retur-status-back');
+  const lostBtn = document.getElementById('retur-status-lost');
+  if (val === 'back') {
+    backBtn.className = 'btn btn-primary btn-sm';
+    lostBtn.className = 'btn btn-ghost btn-sm';
+  } else {
+    backBtn.className = 'btn btn-ghost btn-sm';
+    lostBtn.className = 'btn btn-primary btn-sm';
+  }
+}
+
+export function saveRetur(saleId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale) { showToast('Transaksi tidak ditemukan', 'err'); return; }
+
+  const bookIdRaw = document.getElementById('retur-book-id')?.value;
+  const bookId    = Number(bookIdRaw) || bookIdRaw;
+  const qty       = Number(document.getElementById('retur-qty')?.value) || 0;
+  const status    = document.getElementById('retur-status')?.value;
+  const refund    = Number(document.getElementById('retur-refund')?.value) || 0;
+  const date      = document.getElementById('retur-date')?.value;
+  const note      = (document.getElementById('retur-note')?.value || '').trim();
+
+  const qtySisa   = _qtySisa(sale, bookId);
+  if (qty <= 0)        { showToast('Qty harus > 0', 'err');            return; }
+  if (qty > qtySisa)   { showToast(`Qty max ${qtySisa}`, 'err');       return; }
+  if (refund <= 0)     { showToast('Refund harus > 0', 'err');         return; }
+  if (!date)           { showToast('Tanggal wajib diisi', 'err');      return; }
+  if (!note)           { showToast('Catatan wajib diisi', 'err');      return; }
+
+  const returnedToStock = status === 'back';
+  const cogsPerPc = _cogsPerPcs(sale, bookId);
+  const cogsRetur = qty * cogsPerPc;
+
+  const itemInfo = _returItemsOf(sale).find(x => String(x.bookId) === String(bookId));
+  const bookTitle = itemInfo?.bookTitle || String(bookId);
+
+  // Kalau balik stok — restock ke batch asal (pro-rata dari batchConsumption)
+  if (returnedToStock) {
+    const book = S.books.find(b => String(b.id) === String(bookId));
+    if (book) {
+      const bcSource   = itemInfo?.batchConsumption || [];
+      const bcTotalQty = bcSource.reduce((s, bc) => s + (bc.qty || 0), 0);
+      const canRestoreToOrigin = bcSource.length > 0 && bcTotalQty > 0 && bcSource.every(bc =>
+        book.batches.find(bt => String(bt.id) === String(bc.batchId))
+      );
+
+      if (canRestoreToOrigin) {
+        // Pro-rata alokasi qty retur ke tiap batch asal
+        let allocated = 0;
+        bcSource.forEach((bc, idx) => {
+          const isLast = idx === bcSource.length - 1;
+          const alloc  = isLast ? (qty - allocated) : Math.round((bc.qty || 0) * qty / bcTotalQty);
+          allocated  += alloc;
+          if (alloc <= 0) return;
+          const bt = book.batches.find(b => String(b.id) === String(bc.batchId));
+          if (bt) bt.remaining += alloc;
+        });
+        S.restocks.push({
+          id: uid(), bookId: book.id, bookTitle: book.title,
+          qty, buyPrice: cogsPerPc, date,
+          note: `Retur ke batch asal (trx tgl ${sale.date})`
+        });
+      } else {
+        // Fallback: batch baru
+        book.batches.push({
+          id: uid(), qty, remaining: qty, buyPrice: cogsPerPc,
+          date, note: `Retur (trx tgl ${sale.date})`
+        });
+        S.restocks.push({
+          id: uid(), bookId: book.id, bookTitle: book.title,
+          qty, buyPrice: cogsPerPc, date,
+          note: 'Retur — batch baru'
+        });
+      }
+    }
+  }
+
+  // Push retur record ke sale.returLog[]
+  if (!Array.isArray(sale.returLog)) sale.returLog = [];
+  sale.returLog.push({
+    id: String(uid()),
+    date, bookId, bookTitle,
+    qty, cogs: cogsRetur, refundAmount: refund,
+    returnedToStock, note,
+  });
+
+  S.save();
+  closeModal();
+  showToast(`Retur dicatat · refund ${fmt(refund)}${returnedToStock ? ' · stok balik' : ' · loss'}`);
+  _render();
+}
+
+export function deleteReturEntry(saleId, returId) {
+  const sale = S.sales.find(s => s.id === saleId);
+  if (!sale || !Array.isArray(sale.returLog)) return;
+  const idx = sale.returLog.findIndex(r => r.id === returId);
+  if (idx === -1) return;
+  const r = sale.returLog[idx];
+  if (!confirm(`Batalkan retur "${r.bookTitle}" ×${r.qty} tgl ${r.date}?\n\nCatatan: stok yg sudah balik TIDAK di-auto-adjust. Kalau perlu, edit manual di menu Stok.`)) return;
+  sale.returLog.splice(idx, 1);
+  S.save();
+  showToast('Retur dibatalkan');
+  _render();
+}

@@ -165,6 +165,13 @@ Object.assign(window, {
   openEditSaleModal:      Sales.openEditSaleModal,
   editSalePreview:        Sales.editSalePreview,
   submitEditSale:         Sales.submitEditSale,
+  // Retur
+  openReturModal:         Sales.openReturModal,
+  returOnItemChange:      Sales.returOnItemChange,
+  returPreviewRefund:     Sales.returPreviewRefund,
+  returSetStatus:         Sales.returSetStatus,
+  saveRetur:              Sales.saveRetur,
+  deleteReturEntry:       Sales.deleteReturEntry,
 
   // Bundle
   openBundleModal:    Sales.openBundleModal,

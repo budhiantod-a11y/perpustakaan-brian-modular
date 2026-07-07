@@ -781,11 +781,15 @@ export function render() {
             <thead><tr><th>Tanggal</th><th>Buku / Bundle</th><th>Qty</th><th>Modal/pcs</th><th>Harga Final</th><th>Profit</th><th>Via</th><th>Catatan</th><th></th></tr></thead>
             <tbody>
               ${[...penjualanFiltered].reverse().map(x => {
+                const returCount = (x.returLog || []).reduce((s,r)=>s+(r.qty||0),0);
+                const returBadge = returCount > 0
+                  ? `<span class="badge badge-orange" style="font-size:10px;margin-left:4px" title="${(x.returLog||[]).map(r=>`${r.date} ${r.bookTitle} ×${r.qty} (${r.returnedToStock?'balik':'hilang'}) refund ${fmt(r.refundAmount)}`).join(' · ').replace(/"/g,'&quot;')}">↩ ${returCount}</span>`
+                  : '';
                 if (x.isBundle) {
                   return `
                     <tr class="bundle-row">
                       <td style="color:var(--text3);white-space:nowrap">${x.date}</td>
-                      <td><span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span><strong style="color:#7c3aed" title="${bundleFull(x)}">${bundleShort(x)}</strong></td>
+                      <td><span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span><strong style="color:#7c3aed" title="${bundleFull(x)}">${bundleShort(x)}</strong>${returBadge}</td>
                       <td style="color:#7c3aed;font-size:12px">${x.qty} buku</td>
                       <td style="color:var(--text2);font-size:12px">${fmt(Math.round((x.cogs||0)/(x.qty||1)))}</td>
                       <td><strong style="color:#7c3aed">${fmt(x.finalPrice||x.finalSellPrice)}</strong></td>
@@ -794,6 +798,7 @@ export function render() {
                       <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${x.editNote ? 'Edit: '+x.editNote.replace(/"/g,'&quot;') : ''}">${x.editNote ? '<span style="color:var(--amber)" title="Pernah di-edit">✎ </span>' : ''}${x.note||'—'}</td>
                       <td style="white-space:nowrap">
                         <button class="btn btn-ghost btn-xs" title="Edit harga modal/final" onclick='openEditSaleModal(${JSON.stringify(x.id)})'>Edit</button>
+                        <button class="btn btn-ghost btn-xs" style="color:var(--orange)" title="Catat retur (buku balik/hilang)" onclick='openReturModal(${JSON.stringify(x.id)})'>↩ Retur</button>
                         <button class="btn btn-danger btn-xs" onclick='deleteSaleBundle(${JSON.stringify(x.id)})'>Hapus</button>
                       </td>
                     </tr>`;
@@ -801,7 +806,7 @@ export function render() {
                 return `
                   <tr>
                     <td style="color:var(--text3);white-space:nowrap">${x.date}</td>
-                    <td style="font-weight:600">${x.bookTitle}</td>
+                    <td style="font-weight:600">${x.bookTitle}${returBadge}</td>
                     <td>${x.qty}</td>
                     <td style="color:var(--text2);font-size:12px">${fmt(x.buyPrice||Math.round((x.cogs||0)/(x.qty||1)))}</td>
                     <td>${x.priceOverride
@@ -812,6 +817,7 @@ export function render() {
                     <td style="color:var(--text3);font-size:12px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${x.note||'—'}</td>
                     <td style="white-space:nowrap">
                       <button class="btn btn-ghost btn-xs" title="Edit harga modal/final" onclick='openEditSaleModal(${JSON.stringify(x.id)})'>Edit</button>
+                      <button class="btn btn-ghost btn-xs" style="color:var(--orange)" title="Catat retur (buku balik/hilang)" onclick='openReturModal(${JSON.stringify(x.id)})'>↩ Retur</button>
                       <button class="btn btn-danger btn-xs" onclick='deleteSale(${JSON.stringify(x.id)})' title="Hapus transaksi & kembalikan stok">Hapus</button>
                     </td>
                   </tr>`;
