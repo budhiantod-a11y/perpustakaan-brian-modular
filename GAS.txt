@@ -83,7 +83,7 @@ function syncData(data) {
         'id','bookId','bookTitle','qty','buyPrice','normalPrice','sellPrice',
         'finalPrice','finalSellPrice','cogs','profit','date','via',
         'priceOverride','note','customer','isBundle','bundleId','bundleItems_json','groupId','editNote',
-        'batchConsumption_json'
+        'batchConsumption_json','returLog_json'
       ], function(sale) {
         return [
           sale.id, sale.bookId || '', sale.bookTitle, sale.qty,
@@ -95,7 +95,8 @@ function syncData(data) {
           sale.isBundle ? 'TRUE' : 'FALSE', sale.bundleId || '',
           JSON.stringify(sale.bundleItems || []), sale.groupId || '',
           sale.editNote || '',
-          sale.batchConsumption ? JSON.stringify(sale.batchConsumption) : ''
+          sale.batchConsumption ? JSON.stringify(sale.batchConsumption) : '',
+          (Array.isArray(sale.returLog) && sale.returLog.length) ? JSON.stringify(sale.returLog) : ''
         ];
       });
 
@@ -286,6 +287,12 @@ function loadData() {
       obj.batchConsumption = (bc === '' || bc == null) ? null : JSON.parse(bc);
     } catch(e) { obj.batchConsumption = null; }
     delete obj.batchConsumption_json;
+    try {
+      var rl = obj.returLog_json;
+      obj.returLog = (rl === '' || rl == null) ? [] : JSON.parse(rl);
+      if (!Array.isArray(obj.returLog)) obj.returLog = [];
+    } catch(e) { obj.returLog = []; }
+    delete obj.returLog_json;
     return obj;
   });
 
