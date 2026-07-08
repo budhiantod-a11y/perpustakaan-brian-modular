@@ -115,7 +115,7 @@ export function render() {
             <tbody>
               ${[...filtered].reverse().slice(0,7).map(x => `
                 <tr class="${x.isBundle?'bundle-row':''}">
-                  <td style="color:var(--text3)">${x.date}</td>
+                  <td style="color:var(--text3);white-space:nowrap">${x.date}</td>
                   <td style="font-weight:600">${x.isBundle?`<span class="badge bundle-badge" style="font-size:10px;margin-right:4px">📦</span>`:''}<span style="color:${x.isBundle?'#7c3aed':'inherit'}">${x.isBundle ? bundleShort(x) : x.bookTitle}</span></td>
                   <td>${x.qty}</td>
                   <td>${x.isBundle
