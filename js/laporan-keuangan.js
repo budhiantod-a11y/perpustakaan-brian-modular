@@ -207,6 +207,13 @@ export function calcArusKas() {
     add(cf.date, cf.type, cf.amount || 0);
   }
 
+  // Auto: refund retur dari sale.returLog[] (cash out ke customer)
+  for (const s of S.sales) {
+    for (const r of (s.returLog || [])) {
+      add(r.date, 'expense', r.refundAmount || 0);
+    }
+  }
+
   // Sort bulan ascending, compute running balance
   const months = Object.keys(byMonth).sort();
   let saldo = saldoPembukaan;
@@ -270,15 +277,25 @@ function aggregateLabaRugi(year, monthFrom, monthTo) {
   let revenue = 0, hpp = 0;
   let bebanOngkir = 0, bebanOperasional = 0, bebanIklan = 0, bebanLain = 0;
   let salesCount = 0;
+  let returPenjualan = 0, hppRetur = 0, returCount = 0;
 
   for (const s of S.sales) {
-    if (!inPeriod(s.date, year, monthFrom, monthTo)) continue;
-    const rev = s.isBundle
-      ? (s.finalPrice || s.finalSellPrice || 0)
-      : (s.qty || 0) * (s.finalPrice || s.finalSellPrice || 0);
-    revenue += rev;
-    hpp     += (s.cogs || 0);
-    salesCount++;
+    if (inPeriod(s.date, year, monthFrom, monthTo)) {
+      const rev = s.isBundle
+        ? (s.finalPrice || s.finalSellPrice || 0)
+        : (s.qty || 0) * (s.finalPrice || s.finalSellPrice || 0);
+      revenue += rev;
+      hpp     += (s.cogs || 0);
+      salesCount++;
+    }
+    // Retur diakui di periode retur.date (bukan periode sale), supaya matching
+    // dengan cash refund yang keluar di bulan itu.
+    for (const r of (s.returLog || [])) {
+      if (!inPeriod(r.date, year, monthFrom, monthTo)) continue;
+      returPenjualan += (r.refundAmount || 0);
+      if (r.returnedToStock) hppRetur += (r.cogs || 0);
+      returCount++;
+    }
   }
 
   for (const cf of S.cashflows) {
@@ -293,13 +310,25 @@ function aggregateLabaRugi(year, monthFrom, monthTo) {
     }
   }
 
-  const labaKotor  = revenue - hpp;
+  // Laba Kotor = (Revenue − Retur) − (HPP − HPP_Retur_balik_stok)
+  // Retur balik stok: HPP asli tetap kepotong di 'hpp', tapi buku kembali ke inventory,
+  //   jadi kita koreksi dengan mengurangi HPP sebesar cogs buku yang balik.
+  // Retur hilang: HPP tetap kepotong penuh (buku dianggap loss), tidak ada koreksi HPP.
+  const revenueNet = revenue - returPenjualan;
+  const hppNet     = hpp - hppRetur;
+  const labaKotor  = revenueNet - hppNet;
   const totalBeban = bebanOngkir + bebanOperasional + bebanIklan + bebanLain;
   const labaBersih = labaKotor - totalBeban;
-  const margin     = revenue > 0 ? (labaKotor / revenue) * 100 : 0;
-  const empty      = salesCount === 0 && totalBeban === 0;
+  const margin     = revenueNet > 0 ? (labaKotor / revenueNet) * 100 : 0;
+  const empty      = salesCount === 0 && totalBeban === 0 && returCount === 0;
 
-  return { revenue, hpp, labaKotor, margin, bebanOngkir, bebanOperasional, bebanIklan, bebanLain, totalBeban, labaBersih, empty };
+  return {
+    revenue, returPenjualan, revenueNet,
+    hpp, hppRetur, hppNet,
+    labaKotor, margin,
+    bebanOngkir, bebanOperasional, bebanIklan, bebanLain, totalBeban,
+    labaBersih, empty,
+  };
 }
 
 export function calcLabaRugi(year, month) { return aggregateLabaRugi(year, month, month); }
@@ -347,14 +376,21 @@ export function calcNeraca() {
   const modal = Number(settings.modal_awal) || 0;
 
   // Laba Ditahan = Σ Laba Bersih sejak cut-off (inline, supaya date filter pakai cutOff exact, bukan per bulan)
-  let revPost = 0, hppPost = 0, bebanPost = 0;
+  let revPost = 0, hppPost = 0, bebanPost = 0, returPost = 0, hppReturPost = 0;
   for (const s of S.sales) {
-    if (!s.date || s.date < cutOff) continue;
-    const rev = s.isBundle
-      ? (s.finalPrice || s.finalSellPrice || 0)
-      : (s.qty || 0) * (s.finalPrice || s.finalSellPrice || 0);
-    revPost += rev;
-    hppPost += (s.cogs || 0);
+    if (s.date && s.date >= cutOff) {
+      const rev = s.isBundle
+        ? (s.finalPrice || s.finalSellPrice || 0)
+        : (s.qty || 0) * (s.finalPrice || s.finalSellPrice || 0);
+      revPost += rev;
+      hppPost += (s.cogs || 0);
+    }
+    // Retur di-recognize di tanggal retur (bisa di sale beda periode)
+    for (const r of (s.returLog || [])) {
+      if (!r.date || r.date < cutOff) continue;
+      returPost += (r.refundAmount || 0);
+      if (r.returnedToStock) hppReturPost += (r.cogs || 0);
+    }
   }
   const BEBAN_CATEGORIES = ['ongkir', 'operasional', 'iklan_marketing', 'lainnya'];
   for (const cf of S.cashflows) {
@@ -362,7 +398,7 @@ export function calcNeraca() {
     if (!cf.date || cf.date < cutOff) continue;
     if (BEBAN_CATEGORIES.includes(cf.category)) bebanPost += (cf.amount || 0);
   }
-  const labaDitahan = revPost - hppPost - bebanPost;
+  const labaDitahan = (revPost - returPost) - (hppPost - hppReturPost) - bebanPost;
 
   const totalEkuitas    = modal + labaDitahan;
   const totalLiabEkuitas = totalLiabilitas + totalEkuitas;
@@ -716,9 +752,20 @@ function renderLabaRugi(curr, ytd, prev, year, month, prevY, prevM) {
 
   const labaBersihColor = (v) => v >= 0 ? 'var(--green)' : 'var(--red)';
 
+  const hasRetur = (curr.returPenjualan + ytd.returPenjualan + prev.returPenjualan) > 0;
+
+  const returRows = hasRetur ? `
+    ${row('(-) Retur Penjualan',   curr.returPenjualan, ytd.returPenjualan, prev.returPenjualan, { color: 'var(--orange)' })}
+    ${row('= Pendapatan Bersih',   curr.revenueNet, ytd.revenueNet, prev.revenueNet, { indent: true, color: 'var(--text3)' })}
+    ${row('(-) HPP',               curr.hpp,     ytd.hpp,     prev.hpp)}
+    ${row('(+) Koreksi HPP (buku retur balik stok)', curr.hppRetur, ytd.hppRetur, prev.hppRetur, { indent: true, color: 'var(--text3)' })}
+  ` : `
+    ${row('(-) HPP',               curr.hpp,     ytd.hpp,     prev.hpp)}
+  `;
+
   const bodyHtml = `
     ${row('Pendapatan Penjualan', curr.revenue, ytd.revenue, prev.revenue)}
-    ${row('(-) HPP',              curr.hpp,     ytd.hpp,     prev.hpp)}
+    ${returRows}
     ${row('= LABA KOTOR',         curr.labaKotor, ytd.labaKotor, prev.labaKotor, { bold: true })}
     ${row('Margin %',             curr.margin,  ytd.margin,  prev.margin, { indent: true, isPct: true, color: 'var(--text3)' })}
     <tr><td colspan="4" style="padding:6px 0;border:none"></td></tr>
@@ -744,7 +791,7 @@ function renderLabaRugi(curr, ytd, prev, year, month, prevY, prevM) {
         </div>
       </div>
       <div class="page-sub" style="margin-bottom:12px">
-        Pendapatan diakui saat barang dikirim. HPP = FIFO per transaksi. Beban dari kategori cashflow (skip <code>bayar_po</code>, <code>dp_customer</code>, <code>pinjaman_pemilik</code>, <code>pelunasan_pinjaman</code>).
+        Pendapatan diakui saat barang dikirim. HPP = FIFO per transaksi. Retur di-recognize di tanggal retur (balik-stok: HPP dikoreksi karena buku kembali; hilang: HPP tetap sebagai loss). Beban dari kategori cashflow (skip <code>bayar_po</code>, <code>dp_customer</code>, <code>pinjaman_pemilik</code>, <code>pelunasan_pinjaman</code>).
       </div>
 
       ${curr.empty ? `
