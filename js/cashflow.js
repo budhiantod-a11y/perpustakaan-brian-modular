@@ -40,6 +40,7 @@ export const CATEGORY_LABELS = {
   operasional:        'Operasional',
   iklan_marketing:    'Iklan/Marketing',
   pelunasan_pinjaman: 'Pelunasan Pinjaman Pemilik',
+  retur_penjualan:    'Retur Penjualan',
 };
 
 // ─── Merge logic: gabungkan auto + manual entries ─────────────────────────────
@@ -87,6 +88,25 @@ export function buildLedger(dateFrom, dateTo) {
         delivered: true,
         source:    'auto',
         sourceRef: String(po.id),
+      });
+    }
+  }
+
+  // 2b. Auto entries dari sale.returLog[] — refund ke customer = cash out
+  for (const s of S.sales) {
+    for (const r of (s.returLog || [])) {
+      if (!r.date || r.date < dateFrom || r.date > dateTo) continue;
+      entries.push({
+        id:        'auto-retur-' + s.id + '-' + r.id,
+        date:      r.date,
+        type:      'expense',
+        category:  'retur_penjualan',
+        amount:    r.refundAmount || 0,
+        note:      `Retur ${r.bookTitle} ×${r.qty} (${r.returnedToStock ? 'balik' : 'hilang'})${r.note ? ' — ' + r.note : ''}`,
+        isAdvance: false,
+        delivered: true,
+        source:    'auto',
+        sourceRef: String(s.id),
       });
     }
   }

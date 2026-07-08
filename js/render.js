@@ -1178,6 +1178,7 @@ export function render() {
         operasional:        'background:#f0f9ff;color:#0369a1',
         iklan_marketing:    'background:#fdf4ff;color:#a21caf',
         pelunasan_pinjaman: 'background:#eef2ff;color:#1e3a8a',
+        retur_penjualan:    'background:#fff7ed;color:#ea580c',
         lainnya:            'background:#f5f5f4;color:#57534e',
       };
       return styles[cat] || (type==='income' ? 'background:#dcfce7;color:#16a34a' : 'background:#fee2e2;color:#dc2626');
